@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VaultKey 激活码生成器</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 600px;
+  width: 100%;
+  padding: 40px;
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 32px;
+}
+
+.section {
+  margin-bottom: 32px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title::before {
+  content: '';
+  width: 4px;
+  height: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 2px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+input, textarea, select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: 'Courier New', monospace;
+}
+
+button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 14px 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.output {
+  background: #f8f9fa;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.output-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.output-value {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  color: #333;
+  word-break: break-all;
+  line-height: 1.6;
+}
+
+.output-value.code {
+  font-size: 13px;
+  background: white;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  user-select: all;
+}
+
+.copy-btn {
+  background: #4caf50;
+  padding: 8px 16px;
+  font-size: 13px;
+  margin-top: 12px;
+  width: auto;
+  display: inline-block;
+}
+
+.copy-btn:hover {
+  background: #45a049;
+}
+
+.info-box {
+  background: #e3f2fd;
+  border-left: 4px solid #2196f3;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.info-box strong {
+  color: #1976d2;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.info-box p {
+  color: #555;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.warning-box {
+  background: #fff3e0;
+  border-left: 4px solid #ff9800;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.warning-box strong {
+  color: #f57c00;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.warning-box p {
+  color: #555;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.stat-card {
+  background: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #667eea;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #888;
+}
+
+.success {
+  color: #4caf50;
+  font-weight: 600;
+}
+
+.error {
+  color: #f44336;
+  font-weight: 600;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔐 VaultKey 激活码生成器</h1>
+  <p class="subtitle">为付费用户生成有效的订阅激活码</p>
+
+  <div class="warning-box">
+    <strong>⚠️ 重要提示</strong>
+    <p>此工具仅限管理员使用。生成的激活码有效期为7天，每个激活码只能使用一次。请妥善保存密钥，不要泄露给他人。</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">密钥配置</div>
+    <div class="form-group">
+      <label for="secretKey">密钥 (Secret Key)</label>
+      <input type="password" id="secretKey" value="VaultKey-2024-Subscription-Secret-Key-Do-Not-Share" placeholder="输入密钥">
+      <small style="color: #888; font-size: 12px; margin-top: 4px; display: block;">
+        必须与 VaultKey 应用中的密钥一致
+      </small>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">用户信息</div>
+    <div class="form-group">
+      <label for="userId">用户ID (可选)</label>
+      <input type="text" id="userId" placeholder="例如: user_12345 或订单号">
+    </div>
+    <div class="form-group">
+      <label for="notes">备注 (可选)</label>
+      <textarea id="notes" placeholder="记录用户信息、订单号等"></textarea>
+    </div>
+  </div>
+
+  <div class="section">
+    <button onclick="generateCode()">🎫 生成激活码</button>
+  </div>
+
+  <div id="output" style="display: none;">
+    <div class="section">
+      <div class="section-title">生成结果</div>
+      <div class="output">
+        <div class="output-label">激活码 (32位)</div>
+        <div class="output-value code" id="generatedCode"></div>
+        <button class="copy-btn" onclick="copyCode()">📋 复制激活码</button>
+      </div>
+      
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-value" id="validDays">7</div>
+          <div class="stat-label">有效天数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="subDays">365</div>
+          <div class="stat-label">订阅时长</div>
+        </div>
+      </div>
+
+      <div class="output" style="margin-top: 20px;">
+        <div class="output-label">详细信息</div>
+        <div class="output-value" id="details"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>📝 使用说明</strong>
+    <p>
+      1. 确保密钥与 VaultKey 应用中配置的一致<br>
+      2. 点击"生成激活码"按钮<br>
+      3. 将生成的激活码发送给付费用户<br>
+      4. 用户在支付页面的输入框中粘贴激活码即可激活订阅<br>
+      5. 每个激活码只能使用一次，有效期7天
+    </p>
+  </div>
+</div>
+
+<script>
+async function generateCode() {
+  const secretKey = document.getElementById('secretKey').value;
+  const userId = document.getElementById('userId').value || 'user_' + Date.now();
+  const notes = document.getElementById('notes').value;
+  
+  if (!secretKey) {
+    alert('请输入密钥');
+    return;
+  }
+
+  try {
+    const timestamp = Date.now();
+    const signature = await generateHMAC(secretKey, userId, timestamp);
+    
+    const codeData = {
+      id: userId,
+      ts: timestamp,
+      sig: signature
+    };
+    
+    const code = btoa(JSON.stringify(codeData));
+    
+    // Display results
+    document.getElementById('generatedCode').textContent = code;
+    document.getElementById('output').style.display = 'block';
+    
+    const details = `
+      <strong>用户ID:</strong> ${userId}<br>
+      <strong>生成时间:</strong> ${new Date(timestamp).toLocaleString('zh-CN')}<br>
+      <strong>过期时间:</strong> ${new Date(timestamp + 7 * 24 * 60 * 60 * 1000).toLocaleString('zh-CN')}<br>
+      <strong>签名:</strong> ${signature.substring(0, 32)}...<br>
+      <strong>备注:</strong> ${notes || '无'}
+    `;
+    document.getElementById('details').innerHTML = details;
+    
+  } catch (err) {
+    alert('生成失败: ' + err.message);
+    console.error(err);
+  }
+}
+
+async function generateHMAC(secret, userId, timestamp) {
+  const enc = new TextEncoder();
+  const keyData = enc.encode(secret);
+  const message = enc.encode(`${userId}:${timestamp}`);
+  
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  const signature = await crypto.subtle.sign('HMAC', key, message);
+  const signatureArray = Array.from(new Uint8Array(signature));
+  const signatureHex = signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return signatureHex;
+}
+
+async function copyCode() {
+  const code = document.getElementById('generatedCode').textContent;
+  try {
+    await navigator.clipboard.writeText(code);
+    const btn = document.querySelector('.copy-btn');
+    const originalText = btn.textContent;
+    btn.textContent = '✅ 已复制';
+    btn.style.background = '#45a049';
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.style.background = '';
+    }, 2000);
+  } catch (err) {
+    alert('复制失败，请手动复制');
+  }
+}
+</script>
+</body>
+</html>
