@@ -1,0 +1,4261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; img-src 'self' data:; font-src 'self';">
+<title>VaultKey - 安全密码管理器</title>
+<style>
+/* ============================================
+   CSS Variables & Theme System
+   ============================================ */
+:root {
+  --bg-primary: #0f1117;
+  --bg-secondary: #1a1d27;
+  --bg-tertiary: #242836;
+  --bg-hover: #2d3244;
+  --bg-active: #363b50;
+  --text-primary: #e8eaed;
+  --text-secondary: #9aa0a6;
+  --text-muted: #5f6368;
+  --accent: #6c63ff;
+  --accent-hover: #7b73ff;
+  --accent-light: rgba(108, 99, 255, 0.15);
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --danger-hover: #ef4444;
+  --border: #2d3244;
+  --border-light: #363b50;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  --sidebar-width: 280px;
+  --header-height: 64px;
+}
+
+[data-theme="light"] {
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f0f1f3;
+  --bg-hover: #e8eaed;
+  --bg-active: #dadce0;
+  --text-primary: #202124;
+  --text-secondary: #5f6368;
+  --text-muted: #9aa0a6;
+  --border: #dadce0;
+  --border-light: #e8eaed;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* ============================================
+   Reset & Base
+   ============================================ */
+*, *::before, *::after {
+  margin: 0; padding: 0; box-sizing: border-box;
+}
+
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  overflow: hidden;
+  height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input, button, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  outline: none;
+  border: none;
+  background: none;
+}
+
+button { cursor: pointer; user-select: none; }
+
+a { color: var(--accent); text-decoration: none; }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
+
+.animate-fade { animation: fadeIn 0.3s ease-out; }
+.animate-slide { animation: slideIn 0.3s ease-out; }
+.animate-scale { animation: scaleIn 0.2s ease-out; }
+
+/* ============================================
+   Layout
+   ============================================ */
+.app-container {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ============================================
+   Sidebar
+   ============================================ */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: transform var(--transition), width var(--transition);
+  z-index: 100;
+}
+
+.sidebar-header {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sidebar-logo svg {
+  width: 28px; height: 28px;
+  color: var(--accent);
+}
+
+.sidebar-search {
+  padding: 12px 16px;
+}
+
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  transition: border-color var(--transition);
+}
+
+.search-input-wrap:focus-within {
+  border-color: var(--accent);
+}
+
+.search-input-wrap svg {
+  width: 16px; height: 16px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.search-input-wrap input {
+  flex: 1;
+  background: none;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.search-input-wrap input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-input-wrap .search-shortcut {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  background: var(--bg-hover);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.nav-section {
+  margin-bottom: 8px;
+}
+
+.nav-section-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 8px 12px 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+  font-size: 0.875rem;
+  font-weight: 500;
+  user-select: none;
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.nav-item svg {
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+}
+
+.nav-item .badge {
+  margin-left: auto;
+  font-size: 0.75rem;
+  padding: 1px 8px;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.nav-item.active .badge {
+  background: rgba(108, 99, 255, 0.2);
+  color: var(--accent);
+}
+
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+}
+
+.sidebar-footer .footer-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all var(--transition);
+}
+
+.sidebar-footer .footer-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.sidebar-footer .footer-btn svg {
+  width: 16px; height: 16px;
+}
+
+/* ============================================
+   Main Content
+   ============================================ */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.main-header {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+}
+
+.main-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.main-header-left h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.main-header-left .item-count {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.main-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  transition: all var(--transition);
+}
+
+.header-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.header-btn svg {
+  width: 20px; height: 20px;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all var(--transition);
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(108, 99, 255, 0.3);
+}
+
+.btn-primary svg {
+  width: 16px; height: 16px;
+}
+
+/* ============================================
+   Content Area
+   ============================================ */
+.content-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+/* ============================================
+   Password List
+   ============================================ */
+.password-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+
+.password-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.password-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.password-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--accent);
+  overflow: hidden;
+}
+
+.card-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.card-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.password-card:hover .card-actions {
+  opacity: 1;
+}
+
+.card-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all var(--transition);
+}
+
+.card-action-btn:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.card-action-btn svg {
+  width: 16px; height: 16px;
+}
+
+/* ============================================
+   Detail Panel
+   ============================================ */
+.detail-panel {
+  display: none;
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 440px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  z-index: 200;
+  flex-direction: column;
+  animation: slideIn 0.3s ease-out;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.2);
+}
+
+.detail-panel.open {
+  display: flex;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-header h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.detail-field {
+  margin-bottom: 20px;
+}
+
+.detail-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.detail-field-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-xs);
+  font-size: 0.9rem;
+  word-break: break-all;
+}
+
+.detail-field-value .field-text {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.detail-field-value .field-text.masked {
+  letter-spacing: 0.2em;
+}
+
+.detail-field-value .field-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.detail-field-value .field-btn:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.detail-field-value .field-btn svg {
+  width: 15px; height: 15px;
+}
+
+.detail-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+}
+
+.detail-footer .btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-align: center;
+  transition: all var(--transition);
+}
+
+.btn-edit {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-edit:hover {
+  background: var(--accent-hover);
+}
+
+.btn-delete {
+  background: var(--bg-tertiary);
+  color: var(--danger);
+}
+
+.btn-delete:hover {
+  background: rgba(248, 113, 113, 0.15);
+}
+
+/* ============================================
+   Modal / Dialog
+   ============================================ */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-overlay.open {
+  display: flex;
+}
+
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+  animation: scaleIn 0.25s ease-out;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* ============================================
+   Form Elements
+   ============================================ */
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: border-color var(--transition);
+}
+
+.form-input:focus {
+  border-color: var(--accent);
+}
+
+.form-input::placeholder {
+  color: var(--text-muted);
+}
+
+.form-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.form-input-wrap .form-input {
+  padding-right: 40px;
+}
+
+.form-input-wrap .input-action {
+  position: absolute;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all var(--transition);
+}
+
+.form-input-wrap .input-action:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.form-input-wrap .input-action svg {
+  width: 16px; height: 16px;
+}
+
+.form-select {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa0a6' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  cursor: pointer;
+}
+
+.form-select:focus {
+  border-color: var(--accent);
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color var(--transition);
+}
+
+.form-textarea:focus {
+  border-color: var(--accent);
+}
+
+.form-checkbox-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.form-checkbox {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-light);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.form-checkbox.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.form-checkbox.checked::after {
+  content: '✓';
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.btn {
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all var(--transition);
+}
+
+.btn-ghost {
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+
+.btn-ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-accent:hover {
+  background: var(--accent-hover);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: var(--danger-hover);
+}
+
+/* ============================================
+   Password Generator
+   ============================================ */
+.generator-preview {
+  padding: 14px 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  text-align: center;
+  word-break: break-all;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  position: relative;
+}
+
+.generator-preview .pw-text {
+  flex: 1;
+  text-align: center;
+}
+
+.generator-preview .pw-copy {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.generator-preview .pw-copy:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.generator-preview .pw-copy svg {
+  width: 16px; height: 16px;
+}
+
+.strength-bar {
+  height: 4px;
+  background: var(--bg-hover);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.strength-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.strength-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.generator-options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.generator-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all var(--transition);
+}
+
+.generator-option:hover {
+  background: var(--bg-hover);
+}
+
+.range-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.range-wrap input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 4px;
+  background: var(--bg-hover);
+  border-radius: 2px;
+  outline: none;
+}
+
+.range-wrap input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(108, 99, 255, 0.3);
+}
+
+.range-wrap .range-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.95rem;
+  min-width: 28px;
+  text-align: center;
+}
+
+/* ============================================
+   Login / Setup Screen
+   ============================================ */
+.auth-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: var(--bg-primary);
+  padding: 20px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  animation: scaleIn 0.4s ease-out;
+}
+
+.auth-logo {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.auth-logo svg {
+  width: 56px;
+  height: 56px;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.auth-logo h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.auth-logo p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.auth-form {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+}
+
+.auth-form .form-group:last-of-type {
+  margin-bottom: 24px;
+}
+
+.auth-form .btn-primary {
+  width: 100%;
+  justify-content: center;
+  padding: 12px;
+  font-size: 0.95rem;
+}
+
+.auth-footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.auth-footer a {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.auth-error {
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: var(--radius-xs);
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  color: var(--danger);
+  margin-bottom: 16px;
+  display: none;
+}
+
+.auth-error.show {
+  display: block;
+  animation: shake 0.3s ease;
+}
+
+/* ============================================
+   Dashboard / Security Health
+   ============================================ */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.stat-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.stat-card-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.stat-card-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.stat-card-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.security-score {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 24px;
+  text-align: center;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.score-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 800;
+  position: relative;
+}
+
+.score-circle::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+}
+
+.score-circle span {
+  position: relative;
+  z-index: 1;
+}
+
+.security-issues {
+  margin-top: 20px;
+}
+
+.issue-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  font-size: 0.875rem;
+  transition: all var(--transition);
+  cursor: pointer;
+}
+
+.issue-item:hover {
+  border-color: var(--accent);
+}
+
+.issue-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.issue-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.issue-text {
+  flex: 1;
+}
+
+.issue-text strong {
+  display: block;
+  font-weight: 600;
+}
+
+.issue-text span {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+/* ============================================
+   Empty State
+   ============================================ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.empty-state svg {
+  width: 80px;
+  height: 80px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+}
+
+.empty-state p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  max-width: 360px;
+  margin-bottom: 24px;
+}
+
+/* ============================================
+   Toast Notifications
+   ============================================ */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  padding: 12px 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: fadeIn 0.3s ease-out;
+  max-width: 360px;
+}
+
+.toast.success { border-left: 3px solid var(--success); }
+.toast.error { border-left: 3px solid var(--danger); }
+.toast.warning { border-left: 3px solid var(--warning); }
+.toast.info { border-left: 3px solid var(--accent); }
+
+/* ============================================
+   Settings Page
+   ============================================ */
+.settings-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.settings-section-title {
+  padding: 16px 20px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background var(--transition);
+}
+
+.settings-item:last-child {
+  border-bottom: none;
+}
+
+.settings-item:hover {
+  background: var(--bg-hover);
+}
+
+.settings-item-info {
+  flex: 1;
+}
+
+.settings-item-info strong {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.settings-item-info span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.toggle-switch {
+  width: 44px;
+  height: 24px;
+  background: var(--bg-hover);
+  border-radius: 12px;
+  position: relative;
+  cursor: pointer;
+  transition: background var(--transition);
+  flex-shrink: 0;
+}
+
+.toggle-switch.active {
+  background: var(--accent);
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform var(--transition);
+}
+
+.toggle-switch.active::after {
+  transform: translateX(20px);
+}
+
+/* ============================================
+   Password Strength Colors
+   ============================================ */
+.strength-weak { color: var(--danger); }
+.strength-fair { color: var(--warning); }
+.strength-good { color: #60a5fa; }
+.strength-strong { color: var(--success); }
+
+.bg-weak { background: rgba(248, 113, 113, 0.15); }
+.bg-fair { background: rgba(251, 191, 36, 0.15); }
+.bg-good { background: rgba(96, 165, 250, 0.15); }
+.bg-strong { background: rgba(52, 211, 153, 0.15); }
+
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    transform: translateX(-100%);
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  .detail-panel {
+    width: 100%;
+  }
+  .password-grid {
+    grid-template-columns: 1fr;
+  }
+  .main-header {
+    padding: 0 16px;
+  }
+  .content-area {
+    padding: 16px;
+  }
+  .mobile-menu-btn {
+    display: flex !important;
+  }
+}
+
+.mobile-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+}
+
+.mobile-menu-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.mobile-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 99;
+}
+
+.mobile-overlay.open {
+  display: block;
+}
+
+/* ============================================
+   Loading Spinner
+   ============================================ */
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  gap: 16px;
+}
+
+.loading-overlay .spinner {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+.loading-overlay p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* ============================================
+   Import/Export
+   ============================================ */
+.import-export-area {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.import-export-area:hover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.import-export-area svg {
+  width: 40px;
+  height: 40px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.import-export-area p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* Category tag colors */
+.cat-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cat-social { background: rgba(96, 165, 250, 0.15); color: #60a5fa; }
+.cat-finance { background: rgba(52, 211, 153, 0.15); color: #34d399; }
+.cat-work { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+.cat-shopping { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+.cat-entertainment { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
+.cat-development { background: rgba(34, 211, 238, 0.15); color: #22d3ee; }
+.cat-other { background: rgba(156, 163, 175, 0.15); color: #9ca3af; }
+
+/* ============================================
+   Favorites star
+   ============================================ */
+.favorite-btn {
+  color: var(--text-muted);
+  transition: all var(--transition);
+}
+
+.favorite-btn.active {
+  color: #fbbf24;
+}
+
+/* Hidden file input */
+.hidden-input {
+  display: none;
+}
+
+/* Payment Screen */
+.payment-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-primary);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9998;
+}
+
+.payment-screen.show {
+  display: flex;
+}
+
+.payment-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: var(--shadow);
+}
+
+.payment-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.payment-header svg {
+  width: 64px;
+  height: 64px;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+.payment-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.payment-header p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.payment-price {
+  text-align: center;
+  padding: 20px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  margin-bottom: 24px;
+}
+
+.payment-price .price {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.payment-price .period {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.payment-qr {
+  background: white;
+  padding: 24px;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.payment-qr-placeholder {
+  width: 200px;
+  height: 200px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 20px;
+}
+
+.payment-steps {
+  margin-bottom: 24px;
+}
+
+.payment-step {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+}
+
+.payment-step-num {
+  width: 24px;
+  height: 24px;
+  background: var(--accent);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.payment-step-text {
+  flex: 1;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.payment-step-text strong {
+  color: var(--text-primary);
+}
+
+.payment-input {
+  margin-bottom: 16px;
+}
+
+.payment-input label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.payment-input input {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  font-size: 0.9rem;
+  font-family: var(--font-mono);
+  text-align: center;
+  letter-spacing: 0.1em;
+}
+
+.payment-input input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.payment-btn {
+  width: 100%;
+  padding: 14px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.payment-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.payment-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.payment-footer {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.payment-footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.subscription-status {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.subscription-status.active {
+  border-left: 3px solid var(--success);
+}
+
+.subscription-status.expired {
+  border-left: 3px solid var(--danger);
+}
+
+.subscription-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.subscription-info strong {
+  font-size: 0.9rem;
+}
+
+.subscription-info span {
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.subscription-info .active {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--success);
+}
+
+.subscription-info .expired {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--danger);
+}
+
+.subscription-expire {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Custom fields in add/edit form */
+.custom-fields-list {
+  margin-top: 8px;
+}
+
+.custom-field-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.custom-field-row input {
+  flex: 1;
+}
+
+.custom-field-row .remove-field {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.custom-field-row .remove-field:hover {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--danger);
+}
+</style>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loadingScreen" class="loading-overlay">
+    <div class="spinner"></div>
+    <p>正在初始化安全环境...</p>
+  </div>
+
+  <!-- Auth Screen -->
+  <div id="authScreen" class="auth-screen" style="display:none">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          <circle cx="12" cy="16" r="1"/>
+        </svg>
+        <h1>VaultKey</h1>
+        <p id="authSubtitle">安全、本地、私密的密码管理器</p>
+      </div>
+      <div class="auth-form">
+        <div id="authError" class="auth-error"></div>
+        <div id="setupFields" style="display:none">
+          <div class="form-group">
+            <label class="form-label">创建主密码</label>
+            <div class="form-input-wrap">
+              <input type="password" id="setupPassword" class="form-input" placeholder="输入强主密码（至少8位）" autocomplete="new-password">
+              <button class="input-action" onclick="togglePasswordVisibility('setupPassword', this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">确认主密码</label>
+            <input type="password" id="setupPasswordConfirm" class="form-input" placeholder="再次输入主密码" autocomplete="new-password">
+          </div>
+        </div>
+        <div id="loginFields">
+          <div class="form-group">
+            <label class="form-label">主密码</label>
+            <div class="form-input-wrap">
+              <input type="password" id="loginPassword" class="form-input" placeholder="输入主密码" autocomplete="current-password">
+              <button class="input-action" onclick="togglePasswordVisibility('loginPassword', this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <button id="authSubmit" class="btn-primary" onclick="handleAuth()">
+          <span id="authSubmitText">解锁</span>
+        </button>
+      </div>
+      <div class="auth-footer">
+        <p id="authFooterText">数据完全存储在您的浏览器本地，不会上传至任何服务器</p>
+        <p style="margin-top:8px"><a id="resetVaultLink" onclick="confirmResetVault()" style="display:none">重置保险库</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="mainApp" class="app-container" style="display:none">
+    <!-- Mobile Overlay -->
+    <div id="mobileOverlay" class="mobile-overlay" onclick="closeMobileSidebar()"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            <circle cx="12" cy="16" r="1"/>
+          </svg>
+          VaultKey
+        </div>
+      </div>
+
+      <div class="sidebar-search">
+        <div class="search-input-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" id="searchInput" placeholder="搜索密码..." oninput="handleSearch(this.value)">
+          <span class="search-shortcut">⌘K</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-item active" data-view="all" onclick="switchView('all')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            全部密码
+            <span class="badge" id="badgeAll">0</span>
+          </div>
+          <div class="nav-item" data-view="favorites" onclick="switchView('favorites')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            收藏
+            <span class="badge" id="badgeFavorites">0</span>
+          </div>
+          <div class="nav-item" data-view="security" onclick="switchView('security')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            安全状况
+          </div>
+          <div class="nav-item" data-view="generator" onclick="switchView('generator')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            密码生成器
+          </div>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">分类</div>
+          <div class="nav-item" data-view="cat-social" onclick="switchView('cat-social')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            社交媒体
+            <span class="badge" id="badgeSocial">0</span>
+          </div>
+          <div class="nav-item" data-view="cat-finance" onclick="switchView('cat-finance')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            金融银行
+            <span class="badge" id="badgeFinance">0</span>
+          </div>
+          <div class="nav-item" data-view="cat-work" onclick="switchView('cat-work')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            工作办公
+            <span class="badge" id="badgeWork">0</span>
+          </div>
+          <div class="nav-item" data-view="cat-shopping" onclick="switchView('cat-shopping')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            购物消费
+            <span class="badge" id="badgeShopping">0</span>
+          </div>
+          <div class="nav-item" data-view="cat-entertainment" onclick="switchView('cat-entertainment')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            娱乐休闲
+            <span class="badge" id="badgeEntertainment">0</span>
+          </div>
+          <div class="nav-item" data-view="cat-development" onclick="switchView('cat-development')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            开发工具
+            <span class="badge" id="badgeDevelopment">0</span>
+          </div>
+          <div class="nav-item" data-view="cat-other" onclick="switchView('cat-other')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            其他
+            <span class="badge" id="badgeOther">0</span>
+          </div>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">管理</div>
+          <div class="nav-item" data-view="settings" onclick="switchView('settings')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            设置
+          </div>
+          <div class="nav-item" data-view="import-export" onclick="switchView('import-export')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            导入/导出
+          </div>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="footer-btn" onclick="lockVault()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          锁定
+        </button>
+        <button class="footer-btn" id="themeToggle" onclick="toggleTheme()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          主题
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="main-header">
+        <div class="main-header-left">
+          <button class="mobile-menu-btn" onclick="openMobileSidebar()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <h1 id="viewTitle">全部密码</h1>
+          <span class="item-count" id="itemCount"></span>
+        </div>
+        <div class="main-header-right">
+          <button class="header-btn" onclick="sortPasswords()" title="排序">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="16" y2="6"/><line x1="4" y1="12" x2="13" y2="12"/><line x1="4" y1="18" x2="10" y2="18"/></svg>
+          </button>
+          <button class="btn-primary" onclick="openAddModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            添加密码
+          </button>
+        </div>
+      </header>
+
+      <div class="content-area" id="contentArea">
+        <!-- Dynamic content rendered here -->
+      </div>
+    </main>
+
+    <!-- Detail Panel -->
+    <div id="detailPanel" class="detail-panel">
+      <div class="detail-header">
+        <h2 id="detailTitle">详情</h2>
+        <button class="header-btn" onclick="closeDetailPanel()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="detail-body" id="detailBody">
+        <!-- Dynamic detail content -->
+      </div>
+      <div class="detail-footer">
+        <button class="btn btn-edit" id="detailEditBtn" onclick="editCurrentItem()">编辑</button>
+        <button class="btn btn-delete" id="detailDeleteBtn" onclick="deleteCurrentItem()">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div id="itemModal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle">添加密码</h2>
+        <button class="header-btn" onclick="closeModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">名称 *</label>
+          <input type="text" id="formName" class="form-input" placeholder="例：Gmail、支付宝" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">网址</label>
+          <input type="url" id="formUrl" class="form-input" placeholder="https://example.com" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">用户名 / 邮箱</label>
+          <input type="text" id="formUsername" class="form-input" placeholder="用户名或邮箱" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">密码 *</label>
+          <div class="form-input-wrap">
+            <input type="password" id="formPassword" class="form-input" placeholder="密码" autocomplete="new-password" oninput="updateFormStrength()">
+            <button class="input-action" onclick="togglePasswordVisibility('formPassword', this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div class="strength-bar" style="margin-top:8px">
+            <div class="strength-bar-fill" id="formStrengthBar" style="width:0"></div>
+          </div>
+          <div class="strength-label" id="formStrengthLabel"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">分类</label>
+          <select id="formCategory" class="form-select">
+            <option value="other">其他</option>
+            <option value="social">社交媒体</option>
+            <option value="finance">金融银行</option>
+            <option value="work">工作办公</option>
+            <option value="shopping">购物消费</option>
+            <option value="entertainment">娱乐休闲</option>
+            <option value="development">开发工具</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">备注</label>
+          <textarea id="formNotes" class="form-textarea" placeholder="备注信息（可选）"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">自定义字段</label>
+          <div id="customFieldsList" class="custom-fields-list"></div>
+          <button class="btn btn-ghost" onclick="addCustomField()" style="margin-top:8px;font-size:0.8rem;padding:6px 12px">
+            + 添加字段
+          </button>
+        </div>
+        <div class="form-group">
+          <div class="form-checkbox-wrap" onclick="toggleFormFavorite()">
+            <div class="form-checkbox" id="formFavorite"></div>
+            <span>收藏此密码</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+        <button class="btn btn-accent" onclick="saveItem()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Password Generator Modal -->
+  <div id="generatorModal" class="modal-overlay" onclick="if(event.target===this)closeGeneratorModal()">
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <h2>密码生成器</h2>
+        <button class="header-btn" onclick="closeGeneratorModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="generator-preview" id="genPreview">
+          <span class="pw-text" id="genPasswordText">-</span>
+          <button class="pw-copy" onclick="copyGeneratedPassword()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+        <div class="strength-bar">
+          <div class="strength-bar-fill" id="genStrengthBar" style="width:0"></div>
+        </div>
+        <div class="strength-label" id="genStrengthLabel"></div>
+
+        <div class="form-group">
+          <label class="form-label">密码长度</label>
+          <div class="range-wrap">
+            <input type="range" id="genLength" min="6" max="64" value="20" oninput="generatePassword()">
+            <span class="range-value" id="genLengthValue">20</span>
+          </div>
+        </div>
+
+        <div class="generator-options-grid">
+          <div class="generator-option" onclick="toggleGenOption('uppercase')">
+            <div class="form-checkbox checked" id="genUppercase"></div>
+            <span>大写字母 (A-Z)</span>
+          </div>
+          <div class="generator-option" onclick="toggleGenOption('lowercase')">
+            <div class="form-checkbox checked" id="genLowercase"></div>
+            <span>小写字母 (a-z)</span>
+          </div>
+          <div class="generator-option" onclick="toggleGenOption('numbers')">
+            <div class="form-checkbox checked" id="genNumbers"></div>
+            <span>数字 (0-9)</span>
+          </div>
+          <div class="generator-option" onclick="toggleGenOption('symbols')">
+            <div class="form-checkbox checked" id="genSymbols"></div>
+            <span>特殊符号 (!@#$)</span>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top:16px">
+          <div class="form-checkbox-wrap" onclick="toggleGenOption('excludeSimilar')">
+            <div class="form-checkbox" id="genExcludeSimilar"></div>
+            <span>排除相似字符 (l, 1, I, O, 0)</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="form-checkbox-wrap" onclick="toggleGenOption('excludeAmbiguous')">
+            <div class="form-checkbox" id="genExcludeAmbiguous"></div>
+            <span>排除易混淆符号 ({}, [], (), &lt;&gt;)</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="generatePassword()">重新生成</button>
+        <button class="btn btn-accent" onclick="useGeneratedPassword()">使用此密码</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Dialog -->
+  <div id="confirmDialog" class="modal-overlay" onclick="if(event.target===this)closeConfirm()">
+    <div class="modal" style="max-width:380px">
+      <div class="modal-header">
+        <h2 id="confirmTitle">确认</h2>
+        <button class="header-btn" onclick="closeConfirm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p id="confirmMessage">确定要执行此操作吗？</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeConfirm()">取消</button>
+        <button class="btn btn-danger" id="confirmAction" onclick="">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Hidden file input for import -->
+  <input type="file" id="importFileInput" class="hidden-input" accept=".json,.vaultkey" onchange="handleImportFile(event)">
+
+  <!-- Payment Screen -->
+  <div id="paymentScreen" class="payment-screen">
+    <div class="payment-card">
+      <div class="payment-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          <circle cx="12" cy="16" r="1"/>
+        </svg>
+        <h2>订阅 VaultKey</h2>
+        <p>解锁全部功能，安全存储无限密码</p>
+      </div>
+
+      <div class="payment-price">
+        <div class="price">¥99</div>
+        <div class="period">/ 年</div>
+      </div>
+
+      <div class="payment-steps">
+        <div class="payment-step">
+          <div class="payment-step-num">1</div>
+          <div class="payment-step-text">
+            <strong>扫码支付</strong><br>
+            请使用支付宝扫描下方二维码完成支付
+          </div>
+        </div>
+        <div class="payment-step">
+          <div class="payment-step-num">2</div>
+          <div class="payment-step-text">
+            <strong>联系客服</strong><br>
+            支付后请截图发送给客服获取激活码
+          </div>
+        </div>
+        <div class="payment-step">
+          <div class="payment-step-num">3</div>
+          <div class="payment-step-text">
+            <strong>输入激活码</strong><br>
+            在下方输入框中输入激活码即可解锁
+          </div>
+        </div>
+      </div>
+
+      <div class="payment-qr">
+        <div class="payment-qr-placeholder">
+          <div>
+            支付宝收款码<br>
+            <small style="margin-top:8px;display:block">请扫码支付 ¥99</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="payment-input">
+        <label>输入激活码</label>
+        <input type="text" id="activationCodeInput" placeholder="请输入32位激活码" maxlength="32">
+      </div>
+
+      <button class="payment-btn" onclick="activateSubscription(document.getElementById('activationCodeInput').value)">激活订阅</button>
+
+      <div class="payment-footer">
+        客服微信：<strong>vaultkey_support</strong><br>
+        <small>支付后请联系客服验证订单并发放激活码</small>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ============================================
+// VaultKey - Secure Local Password Manager
+// ============================================
+
+'use strict';
+
+// ============================================
+// Crypto Engine
+// ============================================
+const Crypto = {
+  PBKDF2_ITERATIONS: 600000,
+  SALT_LENGTH: 32,
+  IV_LENGTH: 16,
+
+  async deriveKey(password, salt) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: this.PBKDF2_ITERATIONS, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  },
+
+  async encrypt(data, key) {
+    const enc = new TextEncoder();
+    const iv = crypto.getRandomValues(new Uint8Array(this.IV_LENGTH));
+    const encrypted = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      enc.encode(JSON.stringify(data))
+    );
+    return {
+      iv: this.toBase64(iv),
+      data: this.toBase64(new Uint8Array(encrypted))
+    };
+  },
+
+  async decrypt(encryptedObj, key) {
+    const iv = this.fromBase64(encryptedObj.iv);
+    const data = this.fromBase64(encryptedObj.data);
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      data
+    );
+    return JSON.parse(new TextDecoder().decode(decrypted));
+  },
+
+  async hashPassword(password, salt) {
+    const enc = new TextEncoder();
+    const combined = new Uint8Array([...enc.encode(password), ...salt]);
+    const hash = await crypto.subtle.digest('SHA-256', combined);
+    return this.toBase64(new Uint8Array(hash));
+  },
+
+  generateSalt() {
+    return crypto.getRandomValues(new Uint8Array(this.SALT_LENGTH));
+  },
+
+  toBase64(uint8) {
+    let str = '';
+    for (let i = 0; i < uint8.length; i++) str += String.fromCharCode(uint8[i]);
+    return btoa(str);
+  },
+
+  fromBase64(base64) {
+    const str = atob(base64);
+    const arr = new Uint8Array(str.length);
+    for (let i = 0; i < str.length; i++) arr[i] = str.charCodeAt(i);
+    return arr;
+  },
+
+  generateId() {
+    const arr = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+};
+
+// ============================================
+// Database (IndexedDB)
+// ============================================
+const DB = {
+  name: 'VaultKeyDB',
+  version: 2,
+  db: null,
+
+  async open() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.name, this.version);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => { this.db = request.result; resolve(this.db); };
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('vault')) {
+          db.createObjectStore('vault', { keyPath: 'key' });
+        }
+        if (!db.objectStoreNames.contains('settings')) {
+          db.createObjectStore('settings', { keyPath: 'key' });
+        }
+      };
+    });
+  },
+
+  async get(store, key) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(store, 'readonly');
+      const req = tx.objectStore(store).get(key);
+      req.onsuccess = () => resolve(req.result?.value ?? null);
+      req.onerror = () => reject(req.error);
+    });
+  },
+
+  async set(store, key, value) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(store, 'readwrite');
+      tx.objectStore(store).put({ key, value });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  async remove(store, key) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(store, 'readwrite');
+      tx.objectStore(store).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  async clear(store) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(store, 'readwrite');
+      tx.objectStore(store).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+};
+
+// ============================================
+// App State
+// ============================================
+const State = {
+  cryptoKey: null,
+  items: [],
+  subscription: null, // {activatedAt, expiresAt, code}
+  currentView: 'all',
+  currentSort: 'name-asc',
+  searchQuery: '',
+  editingId: null,
+  selectedId: null,
+  autoLockTimer: null,
+  autoLockMinutes: 10,
+  theme: 'dark',
+  isFormFavorite: false,
+  genOptions: {
+    uppercase: true,
+    lowercase: true,
+    numbers: true,
+    symbols: true,
+    excludeSimilar: false,
+    excludeAmbiguous: false
+  }
+};
+
+// ============================================
+// Subscription Config
+// ============================================
+// IMPORTANT: In production, keep this secret only on the server-side
+// code generator. For this demo/test, it's embedded in the client.
+// The HMAC-based activation codes can be verified offline.
+const SUBSCRIPTION_CONFIG = {
+  secret: 'VaultKey-2024-Subscription-Secret-Key-Do-Not-Share',
+  durationDays: 365, // 1 year subscription
+  price: '¥99',
+  supportWechat: 'vaultkey_support'
+};
+
+// ============================================
+// Category helpers
+// ============================================
+const CATEGORIES = {
+  social: { label: '社交媒体', class: 'cat-social' },
+  finance: { label: '金融银行', class: 'cat-finance' },
+  work: { label: '工作办公', class: 'cat-work' },
+  shopping: { label: '购物消费', class: 'cat-shopping' },
+  entertainment: { label: '娱乐休闲', class: 'cat-entertainment' },
+  development: { label: '开发工具', class: 'cat-development' },
+  other: { label: '其他', class: 'cat-other' }
+};
+
+// ============================================
+// Initialization
+// ============================================
+async function init() {
+  try {
+    await DB.open();
+    const theme = await DB.get('settings', 'theme');
+    if (theme) {
+      State.theme = theme;
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+    const autoLock = await DB.get('settings', 'autoLockMinutes');
+    if (autoLock !== null) State.autoLockMinutes = autoLock;
+
+    // Load subscription
+    const sub = await DB.get('settings', 'subscription');
+    if (sub) {
+      State.subscription = sub;
+    }
+
+    const vaultExists = await checkVaultExists();
+    showAuthScreen(!vaultExists);
+  } catch (err) {
+    console.error('Init error:', err);
+    showToast('初始化失败: ' + err.message, 'error');
+  } finally {
+    document.getElementById('loadingScreen').style.display = 'none';
+  }
+}
+
+async function checkVaultExists() {
+  const salt = await DB.get('vault', 'salt');
+  return salt !== null;
+}
+
+// ============================================
+// Auth Screen
+// ============================================
+function showAuthScreen(isSetup) {
+  const authScreen = document.getElementById('authScreen');
+  authScreen.style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+
+  if (isSetup) {
+    document.getElementById('authSubtitle').textContent = '创建您的保险库';
+    document.getElementById('setupFields').style.display = 'block';
+    document.getElementById('loginFields').style.display = 'none';
+    document.getElementById('authSubmitText').textContent = '创建保险库';
+    document.getElementById('resetVaultLink').style.display = 'none';
+    document.getElementById('authFooterText').textContent = '主密码是访问密码的唯一方式，请牢记！';
+  } else {
+    document.getElementById('authSubtitle').textContent = '输入主密码解锁';
+    document.getElementById('setupFields').style.display = 'none';
+    document.getElementById('loginFields').style.display = 'block';
+    document.getElementById('authSubmitText').textContent = '解锁';
+    document.getElementById('resetVaultLink').style.display = 'inline';
+    document.getElementById('authFooterText').textContent = '数据完全存储在您的浏览器本地，不会上传至任何服务器';
+    setTimeout(() => document.getElementById('loginPassword').focus(), 100);
+  }
+}
+
+async function handleAuth() {
+  const isSetup = document.getElementById('setupFields').style.display !== 'none';
+  hideAuthError();
+
+  if (isSetup) {
+    const pw = document.getElementById('setupPassword').value;
+    const confirm = document.getElementById('setupPasswordConfirm').value;
+
+    if (pw.length < 8) return showAuthError('主密码至少需要8个字符');
+    if (pw !== confirm) return showAuthError('两次输入的密码不一致');
+
+    await createVault(pw);
+  } else {
+    const pw = document.getElementById('loginPassword').value;
+    if (!pw) return showAuthError('请输入主密码');
+    const success = await unlockVault(pw);
+    if (!success) return;
+  }
+}
+
+async function createVault(password) {
+  try {
+    document.getElementById('authSubmitText').textContent = '正在创建...';
+    const salt = Crypto.generateSalt();
+    const key = await Crypto.deriveKey(password, salt);
+    const hash = await Crypto.hashPassword(password, salt);
+
+    await DB.set('vault', 'salt', Crypto.toBase64(salt));
+    await DB.set('vault', 'verify', hash);
+
+    const items = [];
+    const encrypted = await Crypto.encrypt(items, key);
+    await DB.set('vault', 'data', encrypted);
+
+    State.cryptoKey = key;
+    State.items = items;
+
+    showToast('保险库创建成功！', 'success');
+    enterApp();
+  } catch (err) {
+    console.error('Create vault error:', err);
+    showAuthError('创建失败: ' + err.message);
+    document.getElementById('authSubmitText').textContent = '创建保险库';
+  }
+}
+
+async function unlockVault(password) {
+  try {
+    document.getElementById('authSubmitText').textContent = '正在解锁...';
+    const saltB64 = await DB.get('vault', 'salt');
+    const storedHash = await DB.get('vault', 'verify');
+    const salt = Crypto.fromBase64(saltB64);
+
+    const hash = await Crypto.hashPassword(password, salt);
+    if (hash !== storedHash) {
+      document.getElementById('authSubmitText').textContent = '解锁';
+      showAuthError('主密码错误');
+      return false;
+    }
+
+    const key = await Crypto.deriveKey(password, salt);
+    const encrypted = await DB.get('vault', 'data');
+    const items = await Crypto.decrypt(encrypted, key);
+
+    State.cryptoKey = key;
+    State.items = items;
+
+    enterApp();
+    return true;
+  } catch (err) {
+    console.error('Unlock error:', err);
+    document.getElementById('authSubmitText').textContent = '解锁';
+    showAuthError('解锁失败，请检查主密码');
+    return false;
+  }
+}
+
+function enterApp() {
+  document.getElementById('authScreen').style.display = 'none';
+  hidePaymentScreen();
+
+  // Check subscription status
+  if (checkSubscription()) {
+    showMainApp();
+  } else {
+    // Subscription invalid or expired
+    if (State.subscription && State.subscription.expiresAt && State.subscription.expiresAt <= Date.now()) {
+       showToast('您的订阅已过期，请续费以继续使用', 'warning');
+    }
+    showPaymentScreen();
+  }
+
+  document.addEventListener('mousemove', resetAutoLock);
+  document.addEventListener('keydown', resetAutoLock);
+  document.addEventListener('keydown', handleKeyboardShortcuts);
+}
+
+function lockVault() {
+  State.cryptoKey = null;
+  State.items = [];
+  State.selectedId = null;
+  State.editingId = null;
+  closeDetailPanel();
+  clearTimeout(State.autoLockTimer);
+  document.removeEventListener('mousemove', resetAutoLock);
+  document.removeEventListener('keydown', resetAutoLock);
+  document.removeEventListener('keydown', handleKeyboardShortcuts);
+  showAuthScreen(false);
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginPassword').focus();
+  showToast('保险库已锁定', 'info');
+}
+
+function resetAutoLock() {
+  clearTimeout(State.autoLockTimer);
+  if (State.autoLockMinutes > 0) {
+    State.autoLockTimer = setTimeout(() => {
+      lockVault();
+      showToast('已自动锁定（闲置 ' + State.autoLockMinutes + ' 分钟）', 'warning');
+    }, State.autoLockMinutes * 60 * 1000);
+  }
+}
+
+// ============================================
+// Subscription Management
+// ============================================
+function checkSubscription() {
+  if (!State.subscription) return false;
+  if (!State.subscription.code) return false;
+  if (!State.subscription.expiresAt) return false;
+  return Date.now() < State.subscription.expiresAt;
+}
+
+async function activateSubscription(code) {
+  const input = document.getElementById('activationCodeInput');
+  const btn = document.querySelector('.payment-btn');
+  
+  if (!code) {
+    showToast('请输入激活码', 'error');
+    return;
+  }
+  
+  if (code.length !== 32) {
+    showToast('激活码格式错误，应为32位字符', 'error');
+    return;
+  }
+  
+  btn.disabled = true;
+  btn.textContent = '验证中...';
+  
+  try {
+    // Verify activation code using HMAC-SHA256
+    const isValid = await verifyActivationCode(code);
+    
+    if (!isValid) {
+      showToast('激活码无效或已被使用', 'error');
+      btn.disabled = false;
+      btn.textContent = '激活订阅';
+      return;
+    }
+    
+    // Calculate expiration date
+    const now = Date.now();
+    const expiresAt = now + (SUBSCRIPTION_CONFIG.durationDays * 24 * 60 * 60 * 1000);
+    
+    // Save subscription
+    State.subscription = {
+      code: code,
+      activatedAt: now,
+      expiresAt: expiresAt
+    };
+    
+    await DB.set('settings', 'subscription', State.subscription);
+    
+    showToast('订阅激活成功！欢迎使用 VaultKey', 'success');
+    
+    // Clear input
+    input.value = '';
+    
+    // Show main app
+    setTimeout(() => {
+      hidePaymentScreen();
+      showMainApp();
+    }, 1500);
+    
+  } catch (err) {
+    console.error('Activation error:', err);
+    showToast('激活失败：' + err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '激活订阅';
+  }
+}
+
+async function verifyActivationCode(code) {
+  try {
+    // Decode the activation code (Base64 encoded JSON)
+    const decoded = atob(code);
+    const data = JSON.parse(decoded);
+    
+    // Verify structure
+    if (!data.id || !data.sig || !data.ts) {
+      return false;
+    }
+    
+    // Check timestamp (activation codes expire after 7 days)
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    if (Date.now() - data.ts > sevenDaysMs) {
+      return false;
+    }
+    
+    // Verify HMAC signature
+    const expectedSig = await generateHMAC(data.id, data.ts);
+    if (data.sig !== expectedSig) {
+      return false;
+    }
+    
+    return true;
+  } catch (err) {
+    console.error('Code verification error:', err);
+    return false;
+  }
+}
+
+async function generateHMAC(userId, timestamp) {
+  const enc = new TextEncoder();
+  const keyData = enc.encode(SUBSCRIPTION_CONFIG.secret);
+  const message = enc.encode(`${userId}:${timestamp}`);
+  
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  const signature = await crypto.subtle.sign('HMAC', key, message);
+  const signatureArray = Array.from(new Uint8Array(signature));
+  const signatureHex = signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return signatureHex;
+}
+
+function showPaymentScreen() {
+  document.getElementById('paymentScreen').classList.add('show');
+  document.getElementById('mainApp').style.display = 'none';
+  
+  // Update price display
+  const priceEl = document.querySelector('.payment-price .price');
+  if (priceEl) {
+    priceEl.textContent = SUBSCRIPTION_CONFIG.price;
+  }
+  
+  // Update support contact
+  const supportEl = document.querySelector('.payment-footer strong');
+  if (supportEl) {
+    supportEl.textContent = SUBSCRIPTION_CONFIG.supportWechat;
+  }
+}
+
+function hidePaymentScreen() {
+  document.getElementById('paymentScreen').classList.remove('show');
+}
+
+function showMainApp() {
+  document.getElementById('mainApp').style.display = 'flex';
+  renderView();
+  updateBadges();
+  resetAutoLock();
+}
+
+function getSubscriptionStatus() {
+  if (!State.subscription) {
+    return { active: false, expiresAt: null, daysLeft: 0 };
+  }
+  
+  const now = Date.now();
+  const expiresAt = State.subscription.expiresAt;
+  const active = now < expiresAt;
+  const daysLeft = active ? Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000)) : 0;
+  
+  return { active, expiresAt, daysLeft };
+}
+
+// ============================================
+// Data Persistence
+// ============================================
+async function saveData() {
+  if (!State.cryptoKey) return;
+  const encrypted = await Crypto.encrypt(State.items, State.cryptoKey);
+  await DB.set('vault', 'data', encrypted);
+}
+
+// ============================================
+// Views & Rendering
+// ============================================
+function switchView(view) {
+  State.currentView = view;
+  State.selectedId = null;
+  closeDetailPanel();
+
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.view === view);
+  });
+
+  renderView();
+  closeMobileSidebar();
+}
+
+function renderView() {
+  const content = document.getElementById('contentArea');
+  const title = document.getElementById('viewTitle');
+  const countEl = document.getElementById('itemCount');
+
+  // Show/hide add button based on view
+  const addBtn = document.querySelector('.main-header-right .btn-primary');
+
+  switch (State.currentView) {
+    case 'all':
+      title.textContent = '全部密码';
+      addBtn.style.display = '';
+      renderPasswordList(content, getFilteredItems());
+      break;
+    case 'favorites':
+      title.textContent = '收藏';
+      addBtn.style.display = '';
+      renderPasswordList(content, getFilteredItems().filter(i => i.favorite));
+      break;
+    case 'security':
+      title.textContent = '安全状况';
+      addBtn.style.display = 'none';
+      renderSecurityDashboard(content);
+      break;
+    case 'generator':
+      title.textContent = '密码生成器';
+      addBtn.style.display = 'none';
+      renderGeneratorPage(content);
+      break;
+    case 'settings':
+      title.textContent = '设置';
+      addBtn.style.display = 'none';
+      renderSettings(content);
+      break;
+    case 'import-export':
+      title.textContent = '导入/导出';
+      addBtn.style.display = 'none';
+      renderImportExport(content);
+      break;
+    default:
+      if (State.currentView.startsWith('cat-')) {
+        const cat = State.currentView.replace('cat-', '');
+        title.textContent = CATEGORIES[cat]?.label || cat;
+        addBtn.style.display = '';
+        renderPasswordList(content, getFilteredItems().filter(i => i.category === cat));
+      }
+  }
+}
+
+function getFilteredItems() {
+  let items = [...State.items];
+  if (State.searchQuery) {
+    const q = State.searchQuery.toLowerCase();
+    items = items.filter(i =>
+      i.name.toLowerCase().includes(q) ||
+      (i.username && i.username.toLowerCase().includes(q)) ||
+      (i.url && i.url.toLowerCase().includes(q)) ||
+      (i.notes && i.notes.toLowerCase().includes(q))
+    );
+  }
+  return sortItems(items);
+}
+
+function sortItems(items) {
+  switch (State.currentSort) {
+    case 'name-asc': return items.sort((a, b) => a.name.localeCompare(b.name));
+    case 'name-desc': return items.sort((a, b) => b.name.localeCompare(a.name));
+    case 'date-new': return items.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+    case 'date-old': return items.sort((a, b) => (a.updatedAt || a.createdAt) - (b.updatedAt || b.createdAt));
+    default: return items;
+  }
+}
+
+function sortPasswords() {
+  const sorts = ['name-asc', 'name-desc', 'date-new', 'date-old'];
+  const labels = ['名称 A→Z', '名称 Z→A', '最新优先', '最早优先'];
+  const idx = sorts.indexOf(State.currentSort);
+  const next = (idx + 1) % sorts.length;
+  State.currentSort = sorts[next];
+  showToast('排序: ' + labels[next], 'info');
+  renderView();
+}
+
+function renderPasswordList(container, items) {
+  const countEl = document.getElementById('itemCount');
+  countEl.textContent = items.length + ' 条记录';
+
+  if (items.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state animate-fade">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <h3>${State.searchQuery ? '未找到匹配项' : '还没有密码'}</h3>
+        <p>${State.searchQuery ? '尝试其他关键词搜索' : '点击"添加密码"开始保护您的账户安全'}</p>
+        ${!State.searchQuery ? '<button class="btn btn-accent" onclick="openAddModal()">+ 添加第一个密码</button>' : ''}
+      </div>`;
+    return;
+  }
+
+  let html = '<div class="password-grid">';
+  items.forEach((item, idx) => {
+    const initial = item.name.charAt(0).toUpperCase();
+    const catInfo = CATEGORIES[item.category] || CATEGORIES.other;
+    const favicon = item.url ? getFaviconUrl(item.url) : null;
+
+    html += `
+      <div class="password-card ${State.selectedId === item.id ? 'selected' : ''}"
+           onclick="openDetail('${item.id}')" style="animation-delay:${idx * 0.03}s">
+        <div class="card-icon">
+          ${favicon ? `<img src="${favicon}" onerror="this.parentElement.textContent='${initial}'" alt="">` : initial}
+        </div>
+        <div class="card-info">
+          <div class="card-title">${escHtml(item.name)}</div>
+          <div class="card-subtitle">${escHtml(item.username || item.url || '—')}</div>
+        </div>
+        <div class="card-actions">
+          <button class="card-action-btn favorite-btn ${item.favorite ? 'active' : ''}"
+                  onclick="event.stopPropagation();toggleFavorite('${item.id}')" title="收藏">
+            <svg viewBox="0 0 24 24" fill="${item.favorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </button>
+          <button class="card-action-btn" onclick="event.stopPropagation();copyPassword('${item.id}')" title="复制密码">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+      </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// ============================================
+// Detail Panel
+// ============================================
+function openDetail(id) {
+  const item = State.items.find(i => i.id === id);
+  if (!item) return;
+
+  State.selectedId = id;
+  const panel = document.getElementById('detailPanel');
+  const body = document.getElementById('detailBody');
+  document.getElementById('detailTitle').textContent = item.name;
+
+  const catInfo = CATEGORIES[item.category] || CATEGORIES.other;
+  let html = '';
+
+  if (item.url) {
+    html += `
+      <div class="detail-field animate-fade">
+        <div class="detail-field-label">网址</div>
+        <div class="detail-field-value">
+          <span class="field-text">${escHtml(item.url)}</span>
+          <button class="field-btn" onclick="window.open('${escAttr(item.url)}','_blank')" title="打开">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </button>
+          <button class="field-btn" onclick="copyText('${escAttr(item.url)}')" title="复制">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }
+
+  if (item.username) {
+    html += `
+      <div class="detail-field animate-fade" style="animation-delay:0.05s">
+        <div class="detail-field-label">用户名 / 邮箱</div>
+        <div class="detail-field-value">
+          <span class="field-text">${escHtml(item.username)}</span>
+          <button class="field-btn" onclick="copyText('${escAttr(item.username)}')" title="复制">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }
+
+  html += `
+    <div class="detail-field animate-fade" style="animation-delay:0.1s">
+      <div class="detail-field-label">密码</div>
+      <div class="detail-field-value">
+        <span class="field-text masked" id="detailPasswordField">••••••••••</span>
+        <button class="field-btn" onclick="toggleDetailPassword()" title="显示/隐藏" id="detailPwToggle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <button class="field-btn" onclick="copyPassword('${item.id}')" title="复制">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
+      <div style="margin-top:8px">
+        <div class="strength-bar">
+          <div class="strength-bar-fill" id="detailStrengthBar" style="width:0"></div>
+        </div>
+        <div class="strength-label" id="detailStrengthLabel"></div>
+      </div>
+    </div>`;
+
+  html += `
+    <div class="detail-field animate-fade" style="animation-delay:0.15s">
+      <div class="detail-field-label">分类</div>
+      <div class="detail-field-value">
+        <span class="cat-tag ${catInfo.class}">${catInfo.label}</span>
+      </div>
+    </div>`;
+
+  if (item.notes) {
+    html += `
+      <div class="detail-field animate-fade" style="animation-delay:0.2s">
+        <div class="detail-field-label">备注</div>
+        <div class="detail-field-value">
+          <span class="field-text" style="font-family:var(--font);white-space:pre-wrap">${escHtml(item.notes)}</span>
+        </div>
+      </div>`;
+  }
+
+  if (item.customFields && item.customFields.length > 0) {
+    item.customFields.forEach((cf, idx) => {
+      html += `
+        <div class="detail-field animate-fade" style="animation-delay:${0.25 + idx * 0.05}s">
+          <div class="detail-field-label">${escHtml(cf.label)}</div>
+          <div class="detail-field-value">
+            <span class="field-text" id="customField_${idx}">${cf.secret ? '••••••••' : escHtml(cf.value)}</span>
+            ${cf.secret ? `<button class="field-btn" onclick="toggleCustomField(${idx},'${escAttr(cf.value)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>` : ''}
+            <button class="field-btn" onclick="copyText('${escAttr(cf.value)}')" title="复制">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>`;
+    });
+  }
+
+  html += `
+    <div class="detail-field animate-fade" style="animation-delay:0.3s">
+      <div class="detail-field-label">创建时间</div>
+      <div class="detail-field-value">
+        <span class="field-text" style="font-family:var(--font)">${formatDate(item.createdAt)}</span>
+      </div>
+    </div>`;
+
+  if (item.updatedAt) {
+    html += `
+      <div class="detail-field animate-fade" style="animation-delay:0.35s">
+        <div class="detail-field-label">最后修改</div>
+        <div class="detail-field-value">
+          <span class="field-text" style="font-family:var(--font)">${formatDate(item.updatedAt)}</span>
+        </div>
+      </div>`;
+  }
+
+  body.innerHTML = html;
+  panel.classList.add('open');
+
+  // Compute strength
+  const strength = calcStrength(item.password);
+  updateStrengthUI('detailStrengthBar', 'detailStrengthLabel', strength);
+
+  // Store password for toggle
+  body.dataset.password = item.password;
+  body.dataset.passwordVisible = 'false';
+}
+
+function closeDetailPanel() {
+  document.getElementById('detailPanel').classList.remove('open');
+  State.selectedId = null;
+  renderView();
+}
+
+let detailPwVisible = false;
+function toggleDetailPassword() {
+  detailPwVisible = !detailPwVisible;
+  const field = document.getElementById('detailPasswordField');
+  const body = document.getElementById('detailBody');
+  if (detailPwVisible) {
+    field.textContent = body.dataset.password;
+    field.classList.remove('masked');
+  } else {
+    field.textContent = '••••••••••';
+    field.classList.add('masked');
+  }
+}
+
+function toggleCustomField(idx, value) {
+  const el = document.getElementById('customField_' + idx);
+  if (el.textContent === '••••••••') {
+    el.textContent = value;
+  } else {
+    el.textContent = '••••••••';
+  }
+}
+
+function editCurrentItem() {
+  if (!State.selectedId) return;
+  openEditModal(State.selectedId);
+}
+
+function deleteCurrentItem() {
+  if (!State.selectedId) return;
+  const item = State.items.find(i => i.id === State.selectedId);
+  showConfirm('删除密码', `确定要删除「${item.name}」吗？此操作不可恢复。`, async () => {
+    State.items = State.items.filter(i => i.id !== State.selectedId);
+    await saveData();
+    closeDetailPanel();
+    updateBadges();
+    renderView();
+    showToast('已删除', 'success');
+  });
+}
+
+// ============================================
+// Add / Edit Modal
+// ============================================
+function openAddModal() {
+  State.editingId = null;
+  State.isFormFavorite = false;
+  document.getElementById('modalTitle').textContent = '添加密码';
+  document.getElementById('formName').value = '';
+  document.getElementById('formUrl').value = '';
+  document.getElementById('formUsername').value = '';
+  document.getElementById('formPassword').value = '';
+  document.getElementById('formCategory').value = 'other';
+  document.getElementById('formNotes').value = '';
+  document.getElementById('formFavorite').classList.remove('checked');
+  document.getElementById('customFieldsList').innerHTML = '';
+  updateFormStrength();
+  document.getElementById('itemModal').classList.add('open');
+  setTimeout(() => document.getElementById('formName').focus(), 100);
+}
+
+function openEditModal(id) {
+  const item = State.items.find(i => i.id === id);
+  if (!item) return;
+
+  State.editingId = id;
+  State.isFormFavorite = !!item.favorite;
+  document.getElementById('modalTitle').textContent = '编辑密码';
+  document.getElementById('formName').value = item.name;
+  document.getElementById('formUrl').value = item.url || '';
+  document.getElementById('formUsername').value = item.username || '';
+  document.getElementById('formPassword').value = item.password;
+  document.getElementById('formCategory').value = item.category || 'other';
+  document.getElementById('formNotes').value = item.notes || '';
+  document.getElementById('formFavorite').classList.toggle('checked', !!item.favorite);
+
+  // Custom fields
+  const cfList = document.getElementById('customFieldsList');
+  cfList.innerHTML = '';
+  if (item.customFields) {
+    item.customFields.forEach(cf => addCustomField(cf.label, cf.value, cf.secret));
+  }
+
+  updateFormStrength();
+  document.getElementById('itemModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('itemModal').classList.remove('open');
+  State.editingId = null;
+}
+
+async function saveItem() {
+  const name = document.getElementById('formName').value.trim();
+  const password = document.getElementById('formPassword').value;
+
+  if (!name) return showToast('请输入名称', 'error');
+  if (!password) return showToast('请输入密码', 'error');
+
+  const customFields = [];
+  document.querySelectorAll('#customFieldsList .custom-field-row').forEach(row => {
+    const label = row.querySelector('.cf-label').value.trim();
+    const value = row.querySelector('.cf-value').value;
+    const secret = row.querySelector('.cf-secret')?.classList.contains('checked') || false;
+    if (label && value) customFields.push({ label, value, secret });
+  });
+
+  const now = Date.now();
+
+  if (State.editingId) {
+    const item = State.items.find(i => i.id === State.editingId);
+    if (item) {
+      item.name = name;
+      item.url = document.getElementById('formUrl').value.trim();
+      item.username = document.getElementById('formUsername').value.trim();
+      item.password = password;
+      item.category = document.getElementById('formCategory').value;
+      item.notes = document.getElementById('formNotes').value.trim();
+      item.favorite = State.isFormFavorite;
+      item.customFields = customFields;
+      item.updatedAt = now;
+    }
+    showToast('密码已更新', 'success');
+  } else {
+    State.items.push({
+      id: Crypto.generateId(),
+      name,
+      url: document.getElementById('formUrl').value.trim(),
+      username: document.getElementById('formUsername').value.trim(),
+      password,
+      category: document.getElementById('formCategory').value,
+      notes: document.getElementById('formNotes').value.trim(),
+      favorite: State.isFormFavorite,
+      customFields,
+      createdAt: now,
+      updatedAt: null
+    });
+    showToast('密码已添加', 'success');
+  }
+
+  await saveData();
+  closeModal();
+  updateBadges();
+  renderView();
+
+  if (State.selectedId === State.editingId) {
+    openDetail(State.editingId);
+  }
+}
+
+function toggleFormFavorite() {
+  State.isFormFavorite = !State.isFormFavorite;
+  document.getElementById('formFavorite').classList.toggle('checked', State.isFormFavorite);
+}
+
+async function toggleFavorite(id) {
+  const item = State.items.find(i => i.id === id);
+  if (item) {
+    item.favorite = !item.favorite;
+    await saveData();
+    updateBadges();
+    renderView();
+  }
+}
+
+function addCustomField(label = '', value = '', secret = false) {
+  const list = document.getElementById('customFieldsList');
+  const row = document.createElement('div');
+  row.className = 'custom-field-row';
+  row.innerHTML = `
+    <input type="text" class="form-input cf-label" placeholder="字段名" value="${escAttr(label)}">
+    <input type="text" class="form-input cf-value" placeholder="值" value="${escAttr(value)}">
+    <div class="form-checkbox ${secret ? 'checked' : ''} cf-secret" onclick="this.classList.toggle('checked')" title="加密字段" style="flex-shrink:0;width:28px;height:28px;cursor:pointer"></div>
+    <button class="remove-field" onclick="this.parentElement.remove()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>`;
+  list.appendChild(row);
+}
+
+// ============================================
+// Password Strength
+// ============================================
+function calcStrength(password) {
+  if (!password) return { score: 0, label: '', color: '' };
+
+  let score = 0;
+  const len = password.length;
+
+  // Length scoring
+  if (len >= 8) score += 1;
+  if (len >= 12) score += 1;
+  if (len >= 16) score += 1;
+  if (len >= 20) score += 1;
+
+  // Character variety
+  if (/[a-z]/.test(password)) score += 1;
+  if (/[A-Z]/.test(password)) score += 1;
+  if (/[0-9]/.test(password)) score += 1;
+  if (/[^a-zA-Z0-9]/.test(password)) score += 2;
+
+  // Penalties
+  if (/^(.)\1+$/.test(password)) score = 1; // all same char
+  if (/^(012|123|234|345|456|567|678|789|abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz)/i.test(password)) score = Math.max(score - 2, 1);
+
+  // Determine level
+  if (score <= 2) return { score: 20, label: '弱', color: 'var(--danger)', class: 'weak' };
+  if (score <= 4) return { score: 45, label: '一般', color: 'var(--warning)', class: 'fair' };
+  if (score <= 6) return { score: 70, label: '良好', color: '#60a5fa', class: 'good' };
+  return { score: 95, label: '强', color: 'var(--success)', class: 'strong' };
+}
+
+function updateStrengthUI(barId, labelId, strength) {
+  const bar = document.getElementById(barId);
+  const label = document.getElementById(labelId);
+  if (bar) {
+    bar.style.width = strength.score + '%';
+    bar.style.background = strength.color;
+  }
+  if (label) {
+    label.textContent = strength.label ? '密码强度: ' + strength.label : '';
+    label.style.color = strength.color;
+  }
+}
+
+function updateFormStrength() {
+  const pw = document.getElementById('formPassword').value;
+  const strength = calcStrength(pw);
+  updateStrengthUI('formStrengthBar', 'formStrengthLabel', strength);
+}
+
+// ============================================
+// Password Generator
+// ============================================
+function generatePassword() {
+  const length = parseInt(document.getElementById('genLength').value);
+  document.getElementById('genLengthValue').textContent = length;
+
+  const opts = State.genOptions;
+  let chars = '';
+
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const nums = '0123456789';
+  const syms = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`';
+  const similar = 'lI1O0';
+  const ambiguous = '{}[]()<>';
+
+  if (opts.uppercase) chars += upper;
+  if (opts.lowercase) chars += lower;
+  if (opts.numbers) chars += nums;
+  if (opts.symbols) chars += syms;
+
+  if (opts.excludeSimilar) {
+    chars = chars.split('').filter(c => !similar.includes(c)).join('');
+  }
+  if (opts.excludeAmbiguous) {
+    chars = chars.split('').filter(c => !ambiguous.includes(c)).join('');
+  }
+
+  if (!chars) {
+    document.getElementById('genPasswordText').textContent = '请至少选择一种字符类型';
+    return;
+  }
+
+  // Use crypto.getRandomValues for secure generation
+  const arr = new Uint32Array(length);
+  crypto.getRandomValues(arr);
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    password += chars[arr[i] % chars.length];
+  }
+
+  document.getElementById('genPasswordText').textContent = password;
+  const strength = calcStrength(password);
+  updateStrengthUI('genStrengthBar', 'genStrengthLabel', strength);
+}
+
+function toggleGenOption(key) {
+  State.genOptions[key] = !State.genOptions[key];
+  const el = document.getElementById('gen' + key.charAt(0).toUpperCase() + key.slice(1));
+  if (el) el.classList.toggle('checked', State.genOptions[key]);
+  generatePassword();
+}
+
+function copyGeneratedPassword() {
+  const pw = document.getElementById('genPasswordText').textContent;
+  if (pw && pw !== '请至少选择一种字符类型') {
+    copyText(pw);
+  }
+}
+
+function useGeneratedPassword() {
+  const pw = document.getElementById('genPasswordText').textContent;
+  if (pw && pw !== '请至少选择一种字符类型') {
+    document.getElementById('formPassword').value = pw;
+    updateFormStrength();
+    closeGeneratorModal();
+  }
+}
+
+function openGeneratorModal() {
+  document.getElementById('generatorModal').classList.add('open');
+  generatePassword();
+}
+
+function closeGeneratorModal() {
+  document.getElementById('generatorModal').classList.remove('open');
+}
+
+function renderGeneratorPage(container) {
+  container.innerHTML = `
+    <div style="max-width:560px;margin:0 auto">
+      <div class="settings-section animate-fade">
+        <div class="settings-section-title">快速密码生成器</div>
+        <div style="padding:24px">
+          <div class="generator-preview" id="pageGenPreview" style="font-size:1.3rem;min-height:64px;margin-bottom:20px">
+            <span class="pw-text" id="pageGenText">点击下方按钮生成</span>
+            <button class="pw-copy" onclick="copyText(document.getElementById('pageGenText').textContent)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+          <button class="btn btn-accent" style="width:100%;justify-content:center;display:flex;padding:14px;font-size:1rem"
+                  onclick="generatePagePassword()">
+            🎲 生成安全密码
+          </button>
+          <div style="margin-top:20px">
+            <div class="strength-bar">
+              <div class="strength-bar-fill" id="pageGenStrengthBar" style="width:0"></div>
+            </div>
+            <div class="strength-label" id="pageGenStrengthLabel"></div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-section animate-fade" style="animation-delay:0.1s">
+        <div class="settings-section-title">预设模板</div>
+        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <button class="btn btn-ghost" onclick="generatePreset(12,true,true,true,false)">12位 简单</button>
+          <button class="btn btn-ghost" onclick="generatePreset(16,true,true,true,true)">16位 标准</button>
+          <button class="btn btn-ghost" onclick="generatePreset(24,true,true,true,true)">24位 安全</button>
+          <button class="btn btn-ghost" onclick="generatePreset(32,true,true,true,true)">32位 极强</button>
+          <button class="btn btn-ghost" onclick="generatePin(4)">4位 PIN</button>
+          <button class="btn btn-ghost" onclick="generatePin(6)">6位 PIN</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function generatePagePassword() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=';
+  const arr = new Uint32Array(24);
+  crypto.getRandomValues(arr);
+  let pw = '';
+  for (let i = 0; i < 24; i++) pw += chars[arr[i] % chars.length];
+  document.getElementById('pageGenText').textContent = pw;
+  const strength = calcStrength(pw);
+  updateStrengthUI('pageGenStrengthBar', 'pageGenStrengthLabel', strength);
+}
+
+function generatePreset(len, upper, lower, nums, syms) {
+  let chars = '';
+  if (upper) chars += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  if (lower) chars += 'abcdefghijklmnopqrstuvwxyz';
+  if (nums) chars += '0123456789';
+  if (syms) chars += '!@#$%^&*()_+-=';
+  const arr = new Uint32Array(len);
+  crypto.getRandomValues(arr);
+  let pw = '';
+  for (let i = 0; i < len; i++) pw += chars[arr[i] % chars.length];
+  document.getElementById('pageGenText').textContent = pw;
+  const strength = calcStrength(pw);
+  updateStrengthUI('pageGenStrengthBar', 'pageGenStrengthLabel', strength);
+}
+
+function generatePin(len) {
+  const chars = '0123456789';
+  const arr = new Uint32Array(len);
+  crypto.getRandomValues(arr);
+  let pw = '';
+  for (let i = 0; i < len; i++) pw += chars[arr[i] % chars.length];
+  document.getElementById('pageGenText').textContent = pw;
+  const strength = calcStrength(pw);
+  updateStrengthUI('pageGenStrengthBar', 'pageGenStrengthLabel', strength);
+}
+
+// ============================================
+// Security Dashboard
+// ============================================
+function renderSecurityDashboard(container) {
+  const items = State.items;
+  const total = items.length;
+
+  // Analyze
+  const weak = items.filter(i => calcStrength(i.password).score <= 20);
+  const reused = findReusedPasswords(items);
+  const old = items.filter(i => {
+    const age = Date.now() - (i.updatedAt || i.createdAt);
+    return age > 90 * 24 * 60 * 60 * 1000; // >90 days
+  });
+
+  const issues = weak.length + reused.length + old.length;
+  const maxIssues = total * 3 || 1;
+  const healthScore = Math.max(0, Math.round(100 - (issues / maxIssues) * 100));
+
+  let scoreColor = 'var(--success)';
+  let scoreLabel = '优秀';
+  if (healthScore < 50) { scoreColor = 'var(--danger)'; scoreLabel = '需要改进'; }
+  else if (healthScore < 75) { scoreColor = 'var(--warning)'; scoreLabel = '一般'; }
+  else if (healthScore < 90) { scoreColor = '#60a5fa'; scoreLabel = '良好'; }
+
+  let html = `
+    <div class="security-score animate-fade">
+      <div class="score-circle" style="background: conic-gradient(${scoreColor} ${healthScore * 3.6}deg, var(--bg-hover) 0deg)">
+        <span style="color:${scoreColor}">${total > 0 ? healthScore : '—'}</span>
+      </div>
+      <h3 style="margin-bottom:4px">${total > 0 ? scoreLabel : '暂无数据'}</h3>
+      <p style="color:var(--text-secondary);font-size:0.85rem">安全评分${total > 0 ? '（共 ' + total + ' 条密码）' : ''}</p>
+    </div>
+
+    <div class="dashboard-grid">
+      <div class="stat-card animate-fade">
+        <div class="stat-card-icon bg-strong" style="color:var(--success)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div class="stat-card-value">${total}</div>
+        <div class="stat-card-label">总密码数</div>
+      </div>
+      <div class="stat-card animate-fade" style="animation-delay:0.05s">
+        <div class="stat-card-icon bg-weak" style="color:var(--danger)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="stat-card-value" style="color:var(--danger)">${weak.length}</div>
+        <div class="stat-card-label">弱密码</div>
+      </div>
+      <div class="stat-card animate-fade" style="animation-delay:0.1s">
+        <div class="stat-card-icon bg-fair" style="color:var(--warning)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="stat-card-value" style="color:var(--warning)">${reused.length}</div>
+        <div class="stat-card-label">重复使用</div>
+      </div>
+      <div class="stat-card animate-fade" style="animation-delay:0.15s">
+        <div class="stat-card-icon bg-good" style="color:#60a5fa">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="stat-card-value" style="color:#60a5fa">${old.length}</div>
+        <div class="stat-card-label">超过90天未更新</div>
+      </div>
+    </div>`;
+
+  // Issues list
+  if (weak.length + reused.length + old.length > 0) {
+    html += `<div class="security-issues"><h3 style="margin-bottom:12px;font-size:1rem">安全问题</h3>`;
+
+    weak.forEach(item => {
+      html += `
+        <div class="issue-item" onclick="openDetail('${item.id}')">
+          <div class="issue-icon bg-weak" style="color:var(--danger)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div class="issue-text">
+            <strong>${escHtml(item.name)} - 密码强度弱</strong>
+            <span>建议使用更长的密码，包含大小写字母、数字和符号</span>
+          </div>
+        </div>`;
+    });
+
+    reused.forEach(item => {
+      html += `
+        <div class="issue-item" onclick="openDetail('${item.id}')">
+          <div class="issue-icon bg-fair" style="color:var(--warning)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          </div>
+          <div class="issue-text">
+            <strong>${escHtml(item.name)} - 密码重复使用</strong>
+            <span>与其他账户使用了相同的密码，存在连锁风险</span>
+          </div>
+        </div>`;
+    });
+
+    old.forEach(item => {
+      html += `
+        <div class="issue-item" onclick="openDetail('${item.id}')">
+          <div class="issue-icon bg-good" style="color:#60a5fa">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="issue-text">
+            <strong>${escHtml(item.name)} - 密码已过时</strong>
+            <span>已超过90天未更新，建议定期更换密码</span>
+          </div>
+        </div>`;
+    });
+
+    html += `</div>`;
+  } else if (total > 0) {
+    html += `
+      <div class="empty-state animate-fade">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--success)">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <polyline points="9 12 11 14 15 10"/>
+        </svg>
+        <h3 style="color:var(--success)">一切安全！</h3>
+        <p>您的所有密码都符合安全标准</p>
+      </div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function findReusedPasswords(items) {
+  const pwMap = {};
+  items.forEach(i => {
+    if (!pwMap[i.password]) pwMap[i.password] = [];
+    pwMap[i.password].push(i);
+  });
+  const reused = [];
+  Object.values(pwMap).forEach(group => {
+    if (group.length > 1) {
+      group.forEach(i => reused.push(i));
+    }
+  });
+  return reused;
+}
+
+// ============================================
+// Settings
+// ============================================
+function renderSettings(container) {
+  const subStatus = getSubscriptionStatus();
+  const expiresDate = subStatus.expiresAt ? new Date(subStatus.expiresAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) : '未订阅';
+  const statusText = subStatus.active ? '活跃' : '已过期';
+  const statusClass = subStatus.active ? 'active' : 'expired';
+  
+  container.innerHTML = `
+    <div style="max-width:640px">
+      <div class="settings-section animate-fade">
+        <div class="settings-section-title">订阅管理</div>
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <strong>订阅状态</strong>
+            <span>${expiresDate}</span>
+          </div>
+          <span class="subscription-status ${statusClass}">${statusText}</span>
+        </div>
+        ${subStatus.active ? `
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <strong>剩余天数</strong>
+            <span>距离订阅到期还有 ${subStatus.daysLeft} 天</span>
+          </div>
+        </div>
+        ` : ''}
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <strong>${subStatus.active ? '续费订阅' : '重新订阅'}</strong>
+            <span>${subStatus.active ? '提前续费以确保服务不中断' : '订阅已过期，请重新激活'}</span>
+          </div>
+          <button class="btn btn-accent" onclick="showPaymentScreen()">
+            ${subStatus.active ? '续费' : '订阅'}
+          </button>
+        </div>
+        ${State.subscription ? `
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <strong style="color:var(--danger)">清除订阅</strong>
+            <span>清除当前订阅信息（需要重新激活）</span>
+          </div>
+          <button class="btn btn-ghost" style="color:var(--danger)" onclick="clearSubscription()">清除</button>
+        </div>
+        ` : ''}
+      </div>
+
+      <div class="settings-section animate-fade" style="animation-delay:0.05s">
+        <div class="settings-section-title">安全设置</div>
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <strong>自动锁定</strong>
+            <span>无操作后自动锁定保险库</span>
+          </div>
+          <select class="form-select" style="width:auto;min-width:120px" onchange="setAutoLock(this.value)">
+            <option value="5" ${State.autoLockMinutes===5?'selected':''}>5 分钟</option>
+            <option value="10" ${State.autoLockMinutes===10?'selected':''}>10 分钟</option>
+            <option value="15" ${State.autoLockMinutes===15?'selected':''}>15 分钟</option>
+            <option value="30" ${State.autoLockMinutes===30?'selected':''}>30 分钟</option>
+            <option value="60" ${State.autoLockMinutes===60?'selected':''}>1 小时</option>
+            <option value="0" ${State.autoLockMinutes===0?'selected':''}>从不</option>
+          </select>
+        </div>
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <strong>修改主密码</strong>
+            <span>更换用于加密的主密码</span>
+          </div>
+          <button class="btn btn-ghost" onclick="changeMasterPassword()">修改</button>
+        </div>
+      </div>
+
+      <div class="settings-section animate-fade" style="animation-delay:0.1s">
+        <div class="settings-section-title">外观</div>
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <strong>深色模式</strong>
+            <span>切换深色/浅色主题</span>
+          </div>
+          <div class="toggle-switch ${State.theme==='dark'?'active':''}" onclick="toggleTheme()"></div>
+        </div>
+      </div>
+
+      <div class="settings-section animate-fade" style="animation-delay:0.15s">
+        <div class="settings-section-title">数据管理</div>
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <strong>导出备份</strong>
+            <span>导出加密的备份文件</span>
+          </div>
+          <button class="btn btn-ghost" onclick="exportVault()">导出</button>
+        </div>
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <strong>导入数据</strong>
+            <span>从备份文件或其他密码管理器导入</span>
+          </div>
+          <button class="btn btn-ghost" onclick="document.getElementById('importFileInput').click()">导入</button>
+        </div>
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <strong style="color:var(--danger)">重置保险库</strong>
+            <span>删除所有数据并重新开始</span>
+          </div>
+          <button class="btn btn-ghost" style="color:var(--danger)" onclick="confirmResetVault()">重置</button>
+        </div>
+      </div>
+
+      <div class="settings-section animate-fade" style="animation-delay:0.2s">
+        <div class="settings-section-title">关于</div>
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <strong>VaultKey v1.0.0</strong>
+            <span>本地优先的安全密码管理器 · 数据仅存储在您的浏览器中<br>加密算法: AES-256-GCM + PBKDF2 (600,000次迭代)</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function setAutoLock(minutes) {
+  State.autoLockMinutes = parseInt(minutes);
+  await DB.set('settings', 'autoLockMinutes', State.autoLockMinutes);
+  resetAutoLock();
+  showToast('自动锁定设置为 ' + (minutes === '0' ? '从不' : minutes + ' 分钟'), 'success');
+}
+
+async function clearSubscription() {
+  if (!confirm('确定要清除当前订阅吗？清除后需要重新激活才能使用。')) {
+    return;
+  }
+  
+  State.subscription = null;
+  await DB.set('settings', 'subscription', null);
+  
+  showToast('订阅已清除', 'success');
+  
+  // Return to payment screen
+  setTimeout(() => {
+    document.getElementById('mainApp').style.display = 'none';
+    showPaymentScreen();
+  }, 1000);
+}
+
+async function changeMasterPassword() {
+  const oldPw = prompt('请输入当前主密码:');
+  if (!oldPw) return;
+
+  const saltB64 = await DB.get('vault', 'salt');
+  const salt = Crypto.fromBase64(saltB64);
+  const storedHash = await DB.get('vault', 'verify');
+  const hash = await Crypto.hashPassword(oldPw, salt);
+
+  if (hash !== storedHash) {
+    showToast('当前主密码不正确', 'error');
+    return;
+  }
+
+  const newPw = prompt('请输入新的主密码（至少8位）:');
+  if (!newPw || newPw.length < 8) {
+    showToast('新密码至少需要8个字符', 'error');
+    return;
+  }
+
+  const confirmPw = prompt('请确认新主密码:');
+  if (newPw !== confirmPw) {
+    showToast('两次输入不一致', 'error');
+    return;
+  }
+
+  // Re-encrypt with new key
+  const newSalt = Crypto.generateSalt();
+  const newKey = await Crypto.deriveKey(newPw, newSalt);
+  const newHash = await Crypto.hashPassword(newPw, newSalt);
+
+  await DB.set('vault', 'salt', Crypto.toBase64(newSalt));
+  await DB.set('vault', 'verify', newHash);
+
+  const encrypted = await Crypto.encrypt(State.items, newKey);
+  await DB.set('vault', 'data', encrypted);
+
+  State.cryptoKey = newKey;
+  showToast('主密码已更新', 'success');
+}
+
+// ============================================
+// Import / Export
+// ============================================
+function renderImportExport(container) {
+  container.innerHTML = `
+    <div style="max-width:640px">
+      <div class="settings-section animate-fade">
+        <div class="settings-section-title">导出密码</div>
+        <div style="padding:20px">
+          <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px">
+            导出包含所有密码的加密备份文件。备份文件使用主密码加密，只能用相同的主密码恢复。
+          </p>
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-accent" onclick="exportVault()">📦 导出加密备份</button>
+            <button class="btn btn-ghost" onclick="exportCSV()">📄 导出 CSV（明文）</button>
+          </div>
+          <p style="color:var(--danger);font-size:0.8rem;margin-top:10px">
+            ⚠️ CSV文件包含明文密码，请妥善保管！
+          </p>
+        </div>
+      </div>
+
+      <div class="settings-section animate-fade" style="animation-delay:0.1s">
+        <div class="settings-section-title">导入密码</div>
+        <div style="padding:20px">
+          <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px">
+            支持导入 VaultKey 加密备份 (.vaultkey) 或标准 CSV 文件。
+          </p>
+          <div class="import-export-area" onclick="document.getElementById('importFileInput').click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p>点击选择文件或拖放到此处</p>
+            <p style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">支持 .vaultkey / .json / .csv</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section animate-fade" style="animation-delay:0.15s">
+        <div class="settings-section-title">从其他工具导入</div>
+        <div style="padding:20px">
+          <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px">
+            大多数密码管理器支持导出CSV格式，您可以使用该文件导入到VaultKey。
+          </p>
+          <div style="font-size:0.85rem;color:var(--text-secondary);line-height:1.8">
+            <p><strong>支持的CSV格式：</strong></p>
+            <p>• name, url, username, password, notes, category</p>
+            <p>• 兼容 Chrome/Edge 导出的密码CSV</p>
+            <p>• 兼容 1Password/Bitwarden/LastPass 导出格式</p>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  // Add drag and drop
+  const area = container.querySelector('.import-export-area');
+  area.addEventListener('dragover', e => { e.preventDefault(); area.style.borderColor = 'var(--accent)'; });
+  area.addEventListener('dragleave', () => { area.style.borderColor = ''; });
+  area.addEventListener('drop', e => {
+    e.preventDefault();
+    area.style.borderColor = '';
+    if (e.dataTransfer.files.length) {
+      handleImportFileObj(e.dataTransfer.files[0]);
+    }
+  });
+}
+
+async function exportVault() {
+  const encrypted = await Crypto.encrypt(State.items, State.cryptoKey);
+  const exportData = {
+    format: 'vaultkey-v1',
+    version: 1,
+    exported: new Date().toISOString(),
+    salt: await DB.get('vault', 'salt'),
+    data: encrypted
+  };
+  downloadJSON(exportData, `vaultkey-backup-${formatDateShort(Date.now())}.vaultkey`);
+  showToast('备份已导出', 'success');
+}
+
+function exportCSV() {
+  const headers = ['name', 'url', 'username', 'password', 'notes', 'category'];
+  let csv = headers.join(',') + '\n';
+  State.items.forEach(item => {
+    csv += headers.map(h => {
+      const val = item[h] || '';
+      return '"' + String(val).replace(/"/g, '""') + '"';
+    }).join(',') + '\n';
+  });
+  downloadFile(csv, `vaultkey-export-${formatDateShort(Date.now())}.csv`, 'text/csv');
+  showToast('CSV已导出（注意：包含明文密码）', 'warning');
+}
+
+async function handleImportFile(event) {
+  const file = event.target.files[0];
+  if (file) await handleImportFileObj(file);
+  event.target.value = '';
+}
+
+async function handleImportFileObj(file) {
+  try {
+    const text = await file.text();
+    const ext = file.name.split('.').pop().toLowerCase();
+
+    if (ext === 'vaultkey' || ext === 'json') {
+      // Try JSON import
+      const data = JSON.parse(text);
+      if (data.format === 'vaultkey-v1') {
+        // Encrypted backup - try to decrypt
+        const items = await Crypto.decrypt(data.data, State.cryptoKey);
+        const count = await mergeItems(items);
+        showToast(`成功导入 ${count} 条密码`, 'success');
+      } else if (Array.isArray(data)) {
+        // Plain JSON array
+        const count = await mergeItems(data);
+        showToast(`成功导入 ${count} 条密码`, 'success');
+      }
+    } else if (ext === 'csv') {
+      const items = parseCSV(text);
+      const count = await mergeItems(items);
+      showToast(`成功导入 ${count} 条密码`, 'success');
+    } else {
+      showToast('不支持的文件格式', 'error');
+    }
+    renderView();
+    updateBadges();
+  } catch (err) {
+    console.error('Import error:', err);
+    showToast('导入失败: ' + err.message, 'error');
+  }
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+
+  const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
+  const items = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseCSVLine(lines[i]);
+    const obj = {};
+    headers.forEach((h, idx) => {
+      // Map common CSV header names
+      if (h === 'name' || h === 'title' || h === '名称') obj.name = values[idx] || '';
+      else if (h === 'url' || h === 'website' || h === '网址' || h === 'login_uri') obj.url = values[idx] || '';
+      else if (h === 'username' || h === 'email' || h === '用户名' || h === 'login_username') obj.username = values[idx] || '';
+      else if (h === 'password' || h === '密码' || h === 'login_password') obj.password = values[idx] || '';
+      else if (h === 'notes' || h === '备注' || h === 'extra') obj.notes = values[idx] || '';
+      else if (h === 'category' || h === 'folder' || h === '分类' || h === 'group') obj.category = mapCategory(values[idx]);
+    });
+    if (obj.name && obj.password) {
+      items.push({
+        id: Crypto.generateId(),
+        name: obj.name,
+        url: obj.url || '',
+        username: obj.username || '',
+        password: obj.password,
+        notes: obj.notes || '',
+        category: obj.category || 'other',
+        favorite: false,
+        customFields: [],
+        createdAt: Date.now(),
+        updatedAt: null
+      });
+    }
+  }
+  return items;
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function mapCategory(raw) {
+  if (!raw) return 'other';
+  const lower = raw.toLowerCase();
+  if (lower.includes('social') || lower.includes('社交')) return 'social';
+  if (lower.includes('financ') || lower.includes('bank') || lower.includes('金融') || lower.includes('银行')) return 'finance';
+  if (lower.includes('work') || lower.includes('工作') || lower.includes('办公')) return 'work';
+  if (lower.includes('shop') || lower.includes('购物')) return 'shopping';
+  if (lower.includes('entertain') || lower.includes('娱乐') || lower.includes('game')) return 'entertainment';
+  if (lower.includes('dev') || lower.includes('开发') || lower.includes('code')) return 'development';
+  return 'other';
+}
+
+async function mergeItems(newItems) {
+  let count = 0;
+  for (const item of newItems) {
+    const exists = State.items.find(i => i.name === item.name && i.username === item.username);
+    if (!exists) {
+      if (!item.id) item.id = Crypto.generateId();
+      State.items.push(item);
+      count++;
+    }
+  }
+  await saveData();
+  return count;
+}
+
+// ============================================
+// Search
+// ============================================
+function handleSearch(query) {
+  State.searchQuery = query.trim();
+  if (State.currentView !== 'all' && State.currentView !== 'favorites' && !State.currentView.startsWith('cat-')) {
+    switchView('all');
+  } else {
+    renderView();
+  }
+}
+
+// ============================================
+// Keyboard Shortcuts
+// ============================================
+function handleKeyboardShortcuts(e) {
+  // Cmd/Ctrl + K = focus search
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    document.getElementById('searchInput').focus();
+  }
+  // Cmd/Ctrl + N = new item
+  if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+    e.preventDefault();
+    openAddModal();
+  }
+  // Escape = close panels
+  if (e.key === 'Escape') {
+    closeModal();
+    closeDetailPanel();
+    closeGeneratorModal();
+    closeConfirm();
+    document.getElementById('searchInput').blur();
+  }
+  // Cmd/Ctrl + L = lock
+  if ((e.metaKey || e.ctrlKey) && e.key === 'l') {
+    e.preventDefault();
+    lockVault();
+  }
+}
+
+// ============================================
+// Theme
+// ============================================
+async function toggleTheme() {
+  State.theme = State.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', State.theme);
+  await DB.set('settings', 'theme', State.theme);
+}
+
+// ============================================
+// Utility Functions
+// ============================================
+function escHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function escAttr(str) {
+  if (!str) return '';
+  return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+function formatDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+function formatDateShort(ts) {
+  const d = new Date(ts);
+  return d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+}
+
+function getFaviconUrl(url) {
+  try {
+    const u = new URL(url);
+    return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=64`;
+  } catch {
+    return null;
+  }
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('已复制到剪贴板', 'success');
+    // Auto-clear clipboard after 30s
+    setTimeout(async () => {
+      try {
+        const current = await navigator.clipboard.readText();
+        if (current === text) await navigator.clipboard.writeText('');
+      } catch {}
+    }, 30000);
+  } catch {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('已复制到剪贴板', 'success');
+  }
+}
+
+function copyPassword(id) {
+  const item = State.items.find(i => i.id === id);
+  if (item) copyText(item.password);
+}
+
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+function downloadJSON(data, filename) {
+  const json = JSON.stringify(data, null, 2);
+  downloadFile(json, filename, 'application/json');
+}
+
+function downloadFile(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ============================================
+// Badges
+// ============================================
+function updateBadges() {
+  const items = State.items;
+  document.getElementById('badgeAll').textContent = items.length;
+  document.getElementById('badgeFavorites').textContent = items.filter(i => i.favorite).length;
+  document.getElementById('badgeSocial').textContent = items.filter(i => i.category === 'social').length;
+  document.getElementById('badgeFinance').textContent = items.filter(i => i.category === 'finance').length;
+  document.getElementById('badgeWork').textContent = items.filter(i => i.category === 'work').length;
+  document.getElementById('badgeShopping').textContent = items.filter(i => i.category === 'shopping').length;
+  document.getElementById('badgeEntertainment').textContent = items.filter(i => i.category === 'entertainment').length;
+  document.getElementById('badgeDevelopment').textContent = items.filter(i => i.category === 'development').length;
+  document.getElementById('badgeOther').textContent = items.filter(i => i.category === 'other').length;
+}
+
+// ============================================
+// Toast Notifications
+// ============================================
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  const icons = {
+    success: '✅',
+    error: '❌',
+    warning: '⚠️',
+    info: 'ℹ️'
+  };
+  toast.innerHTML = `<span>${icons[type] || ''}</span> ${escHtml(message)}`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(20px)';
+    toast.style.transition = '0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// ============================================
+// Confirm Dialog
+// ============================================
+function showConfirm(title, message, onConfirm) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMessage').textContent = message;
+  document.getElementById('confirmAction').onclick = () => { closeConfirm(); onConfirm(); };
+  document.getElementById('confirmDialog').classList.add('open');
+}
+
+function closeConfirm() {
+  document.getElementById('confirmDialog').classList.remove('open');
+}
+
+function confirmResetVault() {
+  showConfirm('重置保险库', '这将永久删除所有已保存的密码，此操作不可恢复。确定要继续吗？', async () => {
+    await DB.clear('vault');
+    await DB.clear('settings');
+    State.cryptoKey = null;
+    State.items = [];
+    closeDetailPanel();
+    showAuthScreen(true);
+    showToast('保险库已重置', 'info');
+  });
+}
+
+// ============================================
+// Auth Error Display
+// ============================================
+function showAuthError(msg) {
+  const el = document.getElementById('authError');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function hideAuthError() {
+  document.getElementById('authError').classList.remove('show');
+}
+
+// ============================================
+// Mobile Sidebar
+// ============================================
+function openMobileSidebar() {
+  document.getElementById('sidebar').classList.add('mobile-open');
+  document.getElementById('mobileOverlay').classList.add('open');
+}
+
+function closeMobileSidebar() {
+  document.getElementById('sidebar').classList.remove('mobile-open');
+  document.getElementById('mobileOverlay').classList.remove('open');
+}
+
+// ============================================
+// Auth form enter key
+// ============================================
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const authScreen = document.getElementById('authScreen');
+    if (authScreen.style.display !== 'none' && authScreen.style.display !== '') {
+      handleAuth();
+    }
+  }
+});
+
+// ============================================
+// Initialize
+// ============================================
+init();
+</script>
+</body>
+</html>

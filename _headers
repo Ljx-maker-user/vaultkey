@@ -1,0 +1,13 @@
+# VaultKey - 生产环境安全头
+# 适用于 Cloudflare Pages / Netlify 等支持 _headers 的平台
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  X-XSS-Protection: 1; mode=block
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google.com; connect-src 'none'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  Cache-Control: no-store, no-cache, must-revalidate
+  Pragma: no-cache
