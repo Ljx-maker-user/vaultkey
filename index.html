@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; img-src 'self' data: ; font-src 'self';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://*.workers.dev; img-src 'self' data: ; font-src 'self';">
 <title>VaultKey - 安全密码管理器</title>
 <style>
 /* ============================================
@@ -1798,6 +1798,53 @@ a { color: var(--accent); text-decoration: none; }
   background: rgba(248, 113, 113, 0.15);
   color: var(--danger);
 }
+
+/* Payment Actions Styles */
+.payment-actions {
+  margin: 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.payment-status {
+  text-align: center;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  margin: 0 auto 12px;
+  border: 3px solid var(--bg-hover);
+  border-top-color: var(--accent);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.payment-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.payment-divider::before,
+.payment-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
 </style>
 </head>
 <body>
@@ -2197,6 +2244,25 @@ a { color: var(--accent); text-decoration: none; }
         <div class="period">/ 年</div>
       </div>
 
+      <div class="payment-actions" style="margin: 24px 0; display: flex; flex-direction: column; gap: 12px;">
+        <button id="goToPayBtn" class="payment-btn" onclick="goToPayment()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+          🚀 前往爱发电支付
+        </button>
+        <div id="paymentStatus" style="text-align: center; padding: 16px; background: var(--bg-tertiary); border-radius: 8px; display: none;">
+          <div class="spinner" style="margin: 0 auto 12px; border: 3px solid var(--bg-hover); border-top-color: var(--primary); width: 32px; height: 32px; animation: spin 1s linear infinite;"></div>
+          <div style="font-weight: 600; margin-bottom: 8px;">等待支付确认...</div>
+          <div style="font-size: 13px; color: var(--text-secondary);">请在爱发电完成支付，系统将自动激活</div>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin: 24px 0; color: var(--text-muted); font-size: 14px;">
+        <div style="display: flex; align-items: center; gap: 12px; justify-content: center;">
+          <div style="flex: 1; height: 1px; background: var(--border);"></div>
+          <span>或者手动输入激活码</span>
+          <div style="flex: 1; height: 1px; background: var(--border);"></div>
+        </div>
+      </div>
+
       <div class="payment-steps">
         <div class="payment-step">
           <div class="payment-step-num">1</div>
@@ -2421,8 +2487,12 @@ const SUBSCRIPTION_CONFIG = {
   secret: 'VaultKey-2024-Subscription-Secret-Key-Do-Not-Share',
   durationDays: 365, // 1 year subscription
   price: '¥99',
-  supportWechat: 'jx34102l'
+  supportWechat: 'jx34102l',
+  workerUrl: 'YOUR_WORKER_URL', // 部署后替换为实际 URL，如 https://vaultkey-backend.xxx.workers.dev
+  afdianUserId: 'YOUR_AFDIAN_USER_ID' // 替换为你的爱发电 user_id
 };
+
+let paymentPollingInterval = null;
 
 // ============================================
 // Category helpers
@@ -2767,6 +2837,102 @@ function showPaymentScreen() {
 
 function hidePaymentScreen() {
   document.getElementById('paymentScreen').classList.remove('show');
+  stopPaymentPolling();
+}
+
+// ============================================
+// Payment Integration
+// ============================================
+function goToPayment() {
+  if (!SUBSCRIPTION_CONFIG.workerUrl || SUBSCRIPTION_CONFIG.workerUrl === 'YOUR_WORKER_URL') {
+    showToast('支付功能未配置，请联系客服', 'warning');
+    return;
+  }
+  
+  if (!SUBSCRIPTION_CONFIG.afdianUserId || SUBSCRIPTION_CONFIG.afdianUserId === 'YOUR_AFDIAN_USER_ID') {
+    showToast('爱发电未配置，请联系客服', 'warning');
+    return;
+  }
+  
+  // 生成唯一的用户标识（用于追踪订单）
+  const userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  localStorage.setItem('vaultkey_payment_userId', userId);
+  
+  // 显示等待状态
+  const statusDiv = document.getElementById('paymentStatus');
+  if (statusDiv) {
+    statusDiv.style.display = 'block';
+  }
+  
+  // 开始轮询检查支付状态
+  startPaymentPolling(userId);
+  
+  // 跳转到爱发电支付页面
+  const afdianUrl = `https://afdian.net/a/${SUBSCRIPTION_CONFIG.afdianUserId}?custom_order_id=${userId}`;
+  window.open(afdianUrl, '_blank');
+  
+  showToast('已打开爱发电支付页面，请完成支付', 'info');
+}
+
+function startPaymentPolling(userId) {
+  stopPaymentPolling();
+  
+  paymentPollingInterval = setInterval(() => {
+    checkPaymentStatus(userId);
+  }, 5000); // 每 5 秒检查一次
+}
+
+function stopPaymentPolling() {
+  if (paymentPollingInterval) {
+    clearInterval(paymentPollingInterval);
+    paymentPollingInterval = null;
+  }
+}
+
+async function checkPaymentStatus(userId) {
+  if (!SUBSCRIPTION_CONFIG.workerUrl || SUBSCRIPTION_CONFIG.workerUrl === 'YOUR_WORKER_URL') {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`${SUBSCRIPTION_CONFIG.workerUrl}/check-order?userId=${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const result = await response.json();
+    
+    if (result.status === 'completed' && result.activationCode) {
+      // 支付成功，自动激活
+      stopPaymentPolling();
+      
+      // 隐藏等待状态
+      const statusDiv = document.getElementById('paymentStatus');
+      if (statusDiv) {
+        statusDiv.style.display = 'none';
+      }
+      
+      // 自动填入激活码并激活
+      const input = document.getElementById('activationCodeInput');
+      if (input) {
+        input.value = result.activationCode;
+      }
+      
+      showToast('支付成功！正在自动激活...', 'success');
+      
+      // 自动激活
+      setTimeout(() => {
+        activateSubscription(result.activationCode);
+      }, 500);
+      
+      // 清理 localStorage
+      localStorage.removeItem('vaultkey_payment_userId');
+    }
+  } catch (err) {
+    console.error('检查支付状态失败:', err);
+  }
 }
 
 function showMainApp() {
