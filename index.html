@@ -2693,24 +2693,31 @@ async function activateSubscription(code) {
 
 async function verifyActivationCode(code) {
   try {
+    // Trim whitespace and newlines
+    code = code.trim();
+    
     // Decode the activation code (Base64 encoded JSON)
     const decoded = atob(code);
     const data = JSON.parse(decoded);
     
     // Verify structure
     if (!data.id || !data.sig || !data.ts) {
+      console.error('Invalid structure:', data);
       return false;
     }
     
     // Check timestamp (activation codes expire after 7 days)
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     if (Date.now() - data.ts > sevenDaysMs) {
+      console.error('Code expired:', data.ts, 'Now:', Date.now());
       return false;
     }
     
     // Verify HMAC signature
     const expectedSig = await generateHMAC(data.id, data.ts);
+    console.log('Expected sig:', expectedSig, 'Got:', data.sig);
     if (data.sig !== expectedSig) {
+      console.error('Signature mismatch');
       return false;
     }
     
