@@ -2227,7 +2227,7 @@ a { color: var(--accent); text-decoration: none; }
 
       <div class="payment-input">
         <label>输入激活码</label>
-        <input type="text" id="activationCodeInput" placeholder="请输入32位激活码" maxlength="32">
+        <input type="text" id="activationCodeInput" placeholder="请粘贴激活码" style="word-break:break-all">
       </div>
 
       <button class="payment-btn" onclick="activateSubscription(document.getElementById('activationCodeInput').value)">激活订阅</button>
