@@ -2869,7 +2869,7 @@ function goToPayment() {
   startPaymentPolling(userId);
   
   // 跳转到爱发电支付页面
-  const afdianUrl = `https://afdian.net/a/${SUBSCRIPTION_CONFIG.afdianProfileSlug}?custom_order_id=${userId}`;
+  const afdianUrl = `https://afdian.com/a/${SUBSCRIPTION_CONFIG.afdianProfileSlug}?custom_order_id=${userId}`;
   window.open(afdianUrl, '_blank');
   
   showToast('已打开爱发电支付页面，请完成支付', 'info');
