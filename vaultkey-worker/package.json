@@ -1,0 +1,14 @@
+{
+  "name": "vaultkey-worker",
+  "version": "1.0.0",
+  "description": "VaultKey Backend - Cloudflare Worker for payment processing",
+  "main": "src/worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^3.114.17"
+  }
+}
