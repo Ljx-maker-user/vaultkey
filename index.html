@@ -2640,8 +2640,8 @@ async function activateSubscription(code) {
     return;
   }
   
-  if (code.length !== 32) {
-    showToast('激活码格式错误，应为32位字符', 'error');
+  if (code.trim().length < 50) {
+    showToast('激活码格式错误', 'error');
     return;
   }
   
